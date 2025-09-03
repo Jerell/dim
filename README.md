@@ -87,11 +87,11 @@ pub fn main() void {
 
     const p1 = dim.bar(1.0);       // 1 bar
     const p2 = dim.Pa(50000.0);    // 50 kPa
-    const p3 = P.add(p1, p2);      // 150 kPa
+    const p3 = p1.add(p2);      // 150 kPa
 
     const t1 = dim.C(20.0);        // 20 °C
     const t2 = dim.K(300.0);       // 300 K
-    const t3 = T.add(t1, t2);      // 593.15 K
+    const t3 = t1.add(t2);      // 593.15 K
 
     std.debug.print("p3 = {}\n", .{p3}); // auto prefix → "150.000 kPa"
     std.debug.print("t3 = {}\n", .{t3}); // "593.150 K"

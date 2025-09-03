@@ -1,0 +1,21 @@
+# Ensure consistent line endings
+* text=auto eol=lf
+
+# Treat Zig source files as text
+*.zig text diff
+
+# Treat build files as text
+build.zig text diff
+build.zig.zon text diff
+
+# Documentation
+*.md text diff
+LICENSE text
+
+# Ignore diffs for generated files (optional)
+zig-out/* -diff
+.zig-cache/* -diff
+
+# GitHub linguist overrides (optional)
+# Force GitHub to recognize Zig as the main language
+*.zig linguist-language=Zig

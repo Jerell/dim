@@ -44,36 +44,38 @@ pub const Dimension = struct {
     }
 };
 
+fn quantityDim(comptime T: type) Dimension {
+    // Require that T is a Quantity(...); we check it has a public const dim.
+    if (@hasDecl(T, "dim")) {
+        const d = @field(T, "dim");
+        if (@TypeOf(d) == Dimension) return d;
+    }
+    @compileError("Expected a Quantity(...) type as operand");
+}
+
 pub fn Quantity(comptime Dim: Dimension) type {
     return struct {
+        pub const dim: Dimension = Dim;
         value: f64,
 
         pub fn init(v: f64) Quantity(Dim) {
             return .{ .value = v };
         }
 
-        pub fn add(a: Quantity(Dim), b: Quantity(Dim)) Quantity(Dim) {
-            return .{ .value = a.value + b.value };
+        pub fn add(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
+            return .{ .value = self.value + other.value };
         }
 
-        pub fn sub(a: Quantity(Dim), b: Quantity(Dim)) Quantity(Dim) {
-            return .{ .value = a.value - b.value };
+        pub fn sub(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
+            return .{ .value = self.value - other.value };
         }
 
-        pub fn mul(
-            comptime OtherDim: Dimension,
-            a: Quantity(Dim),
-            b: Quantity(OtherDim),
-        ) Quantity(Dimension.add(Dim, OtherDim)) {
-            return .{ .value = a.value * b.value };
+        pub fn mul(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
+            return .{ .value = self.value * other.value };
         }
 
-        pub fn div(
-            comptime OtherDim: Dimension,
-            a: Quantity(Dim),
-            b: Quantity(OtherDim),
-        ) Quantity(Dimension.sub(Dim, OtherDim)) {
-            return .{ .value = a.value / b.value };
+        pub fn div(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
+            return .{ .value = self.value / other.value };
         }
     };
 }
@@ -110,14 +112,13 @@ test "basic dimensional arithmetic" {
 
     const d = LengthQ.init(100.0); // 100 m
     const t = TimeQ.init(10.0); // 10 s
-    const v = LengthQ.div(DIM.Time, d, t);
+    const v = d.div(t);
 
     try std.testing.expectApproxEqAbs(10.0, v.value, 1e-9);
     comptime {
         // Ensure type is correct at compile time
-        _ = SpeedQ.init(1.0);
-        // Uncommenting this should fail to compile:
-        // _ = LengthQ.add(d, t);
+        const ResultQ = @TypeOf(v);
+        _ = @as(SpeedQ, ResultQ{ .value = 0.0 });
     }
 }
 
@@ -128,10 +129,12 @@ test "force = mass * acceleration" {
 
     const m = MassQ.init(2.0); // 2 kg
     const a = AccelQ.init(9.81); // 9.81 m/s^2
-    const f = MassQ.mul(DIM.Acceleration, m, a);
+    const f = m.mul(a);
 
     comptime {
-        _ = ForceQ.init(f.value);
+        const ResultQ = @TypeOf(f);
+        // If ResultQ is not ForceQ, the following cast will fail at comptime:
+        _ = @as(ForceQ, ResultQ{ .value = 0.0 });
     }
 
     try std.testing.expectApproxEqAbs(19.62, f.value, 1e-9);

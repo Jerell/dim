@@ -11,7 +11,7 @@ pub fn main() !void {
 
     const d = LengthQ.init(100.0);
     const t = TimeQ.init(9.58);
-    const v = LengthQ.div(dim.DIM.Time, d, t);
+    const v = d.div(t);
 
     try io.printf("Usain Bolt speed: {d:.2} m/s\n", .{v.value});
 }

@@ -91,10 +91,10 @@ pub fn main() void {
 
     const t1 = dim.C(20.0);        // 20 °C
     const t2 = dim.K(300.0);       // 300 K
-    const t3 = t1.add(t2);      // 593.15 K
+    const t3 = t1.add(t2);      // 583.15 K
 
     std.debug.print("p3 = {}\n", .{p3}); // auto prefix → "150.000 kPa"
-    std.debug.print("t3 = {}\n", .{t3}); // "593.150 K"
+    std.debug.print("t3 = {}\n", .{t3}); // "583.150 K"
 }
 ```
 

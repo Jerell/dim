@@ -1,5 +1,10 @@
-//! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
+
+const QuantityError = error{
+    AbsPlusAbsTemperature,
+    DeltaMinusAbsTemperature,
+    MulDivTemperatureDelta,
+};
 
 pub const Dimension = struct {
     L: i32, // length
@@ -53,29 +58,91 @@ fn quantityDim(comptime T: type) Dimension {
     @compileError("Expected a Quantity(...) type as operand");
 }
 
+fn isTemperatureDim(comptime D: Dimension) bool {
+    return D.L == 0 and D.M == 0 and D.T == 0 and D.I == 0 and D.Th == 1 and D.N == 0 and D.J == 0;
+}
+
 pub fn Quantity(comptime Dim: Dimension) type {
     return struct {
         pub const dim: Dimension = Dim;
         value: f64,
+        is_delta: bool,
 
         pub fn init(v: f64) Quantity(Dim) {
-            return .{ .value = v };
+            return .{ .value = v, .is_delta = false };
         }
 
+        // pub fn format(
+        //     self: Quantity(Dim),
+        //     comptime fmt: []const u8,
+        //     options: std.fmt.FormatOptions,
+        //     writer: anytype,
+        // ) !void {
+        //     _ = fmt;
+        //     _ = options;
+        //     if (self.is_delta) {
+        //         try std.fmt.format(writer, "Δ{d}", .{self.value});
+        //     } else {
+        //         try std.fmt.format(writer, "{d}", .{self.value});
+        //     }
+        // }
+
         pub fn add(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
-            return .{ .value = self.value + other.value };
+            if (comptime isTemperatureDim(Dim)) {
+                // Always treat RHS as delta if it's not already
+                if (self.is_delta and other.is_delta) {
+                    return .{ .value = self.value + other.value, .is_delta = true };
+                }
+                if (self.is_delta and !other.is_delta) {
+                    return .{ .value = self.value + other.value, .is_delta = false };
+                }
+                // self is abs
+                return .{ .value = self.value + other.value, .is_delta = false };
+            } else {
+                return .{ .value = self.value + other.value, .is_delta = self.is_delta or other.is_delta };
+            }
         }
 
         pub fn sub(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
-            return .{ .value = self.value - other.value };
+            if (comptime isTemperatureDim(Dim)) {
+                if (!self.is_delta and !other.is_delta) {
+                    // abs - abs = delta
+                    return .{ .value = self.value - other.value, .is_delta = true };
+                }
+                if (!self.is_delta and other.is_delta) {
+                    return .{ .value = self.value - other.value, .is_delta = false };
+                }
+                if (self.is_delta and other.is_delta) {
+                    return .{ .value = self.value - other.value, .is_delta = true };
+                }
+                // delta - abs → treat RHS as delta
+                return .{ .value = self.value - other.value, .is_delta = true };
+            } else {
+                return .{ .value = self.value - other.value, .is_delta = self.is_delta or other.is_delta };
+            }
         }
 
         pub fn mul(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
-            return .{ .value = self.value * other.value };
+            const Other = @TypeOf(other);
+            const OtherDim = comptime quantityDim(Other);
+            // Conservative rule: forbid multiplying if either operand is a temperature delta.
+            if ((comptime isTemperatureDim(Dim) and self.is_delta) or
+                (comptime isTemperatureDim(OtherDim) and other.is_delta))
+            {
+                @compileError("Multiplying temperature deltas is not supported.");
+            }
+            return .{ .value = self.value * other.value, .is_delta = false };
         }
 
         pub fn div(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
-            return .{ .value = self.value / other.value };
+            const Other = @TypeOf(other);
+            const OtherDim = comptime quantityDim(Other);
+            if ((comptime isTemperatureDim(Dim) and self.is_delta) or
+                (comptime isTemperatureDim(OtherDim) and other.is_delta))
+            {
+                @compileError("Dividing temperature deltas is not supported.");
+            }
+            return .{ .value = self.value / other.value, .is_delta = false };
         }
     };
 }
@@ -118,7 +185,7 @@ test "basic dimensional arithmetic" {
     comptime {
         // Ensure type is correct at compile time
         const ResultQ = @TypeOf(v);
-        _ = @as(SpeedQ, ResultQ{ .value = 0.0 });
+        _ = @as(SpeedQ, ResultQ{ .value = 0.0, .is_delta = false });
     }
 }
 
@@ -134,8 +201,76 @@ test "force = mass * acceleration" {
     comptime {
         const ResultQ = @TypeOf(f);
         // If ResultQ is not ForceQ, the following cast will fail at comptime:
-        _ = @as(ForceQ, ResultQ{ .value = 0.0 });
+        _ = @as(ForceQ, ResultQ{ .value = 0.0, .is_delta = false });
     }
 
     try std.testing.expectApproxEqAbs(19.62, f.value, 1e-9);
+}
+
+test "temperature: abs + delta -> abs" {
+    const TempQ = Quantity(DIM.Temperature);
+
+    // 10 °C absolute = 283.15 K
+    const t_abs = TempQ.init(10.0 + 273.15);
+
+    // 20 °F delta => 20 * 5/9 K = 11.111... K
+    const dF_in_K = 20.0 * 5.0 / 9.0;
+    const t_delta = TempQ.init(dF_in_K);
+
+    const sum = t_abs.add(t_delta); // abs + delta -> abs
+    try std.testing.expect(!sum.is_delta);
+    try std.testing.expectApproxEqAbs(283.15 + dF_in_K, sum.value, 1e-9);
+}
+
+test "temperature: delta + abs -> abs" {
+    const TempQ = Quantity(DIM.Temperature);
+
+    // 300 K absolute
+    const t_abs = TempQ.init(300.0);
+
+    // 10 °C delta = 10 K
+    const t_delta = TempQ.init(10.0);
+
+    const sum = t_delta.add(t_abs); // delta + abs -> abs
+    try std.testing.expect(!sum.is_delta);
+    try std.testing.expectApproxEqAbs(310.0, sum.value, 1e-9);
+}
+
+test "temperature: delta + delta -> delta" {
+    const TempQ = Quantity(DIM.Temperature);
+
+    // 10 °C delta = 10 K
+    const d1 = TempQ{ .value = 10.0, .is_delta = true };
+    // 18 °F delta = 10 K
+    const d2 = TempQ{ .value = 18.0 * 5.0 / 9.0, .is_delta = true };
+
+    const dsum = d1.add(d2); // delta + delta -> delta
+    try std.testing.expect(dsum.is_delta);
+    try std.testing.expectApproxEqAbs(20.0, dsum.value, 1e-9);
+}
+
+test "temperature: abs - abs -> delta" {
+    const TempQ = Quantity(DIM.Temperature);
+
+    // 310 K absolute
+    const a = TempQ.init(310.0);
+    // 20 °C absolute = 293.15 K
+    const b = TempQ.init(20.0 + 273.15);
+
+    const diff = a.sub(b); // abs - abs -> delta
+    try std.testing.expect(diff.is_delta);
+    try std.testing.expectApproxEqAbs(16.85, diff.value, 1e-9);
+}
+
+test "temperature: abs - delta -> abs" {
+    const TempQ = Quantity(DIM.Temperature);
+
+    // 300 K absolute
+    const a = TempQ.init(300.0);
+    // 20 °C delta = 20 K
+    const d = TempQ{ .value = 20.0, .is_delta = true };
+
+    const res = a.sub(d); // abs - delta -> abs
+    try std.testing.expect(!res.is_delta);
+    try std.testing.expectApproxEqAbs(280.0, res.value, 1e-9);
 }

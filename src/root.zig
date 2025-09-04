@@ -72,20 +72,16 @@ pub fn Quantity(comptime Dim: Dimension) type {
             return .{ .value = v, .is_delta = false };
         }
 
-        // pub fn format(
-        //     self: Quantity(Dim),
-        //     comptime fmt: []const u8,
-        //     options: std.fmt.FormatOptions,
-        //     writer: anytype,
-        // ) !void {
-        //     _ = fmt;
-        //     _ = options;
-        //     if (self.is_delta) {
-        //         try std.fmt.format(writer, "Δ{d}", .{self.value});
-        //     } else {
-        //         try std.fmt.format(writer, "{d}", .{self.value});
-        //     }
-        // }
+        pub fn format(
+            self: Quantity(Dim),
+            writer: *std.Io.Writer,
+        ) !void {
+            if (self.is_delta) {
+                try writer.print("Δ{d}", .{self.value});
+            } else {
+                try writer.print("{d}", .{self.value});
+            }
+        }
 
         pub fn add(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
             if (comptime isTemperatureDim(Dim)) {

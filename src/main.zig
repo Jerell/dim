@@ -13,6 +13,6 @@ pub fn main() !void {
     const t = TimeQ.init(9.58);
     const v = d.div(t);
 
-    try io.printf("Usain Bolt speed: {d:.2} m/s\n", .{v.value});
-    std.debug.print("{}", .{v});
+    try io.printf("Usain Bolt speed: {f} m/s\n", .{v});
+    std.debug.print("{f}", .{v});
 }

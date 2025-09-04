@@ -33,6 +33,7 @@ pub const Io = struct {
 
     // stdout helpers
     pub fn printf(self: *Io, comptime fmt: []const u8, args: anytype) !void {
+        // Callers must pass a tuple: .{...}
         try self.out.print(fmt, args);
     }
     pub fn writeAll(self: *Io, bytes: []const u8) !void {
@@ -47,13 +48,21 @@ pub const Io = struct {
         try self.err.writeAll(bytes);
     }
 
-    // stdin helpers (examples)
-    pub fn readLineAlloc(self: *Io, allocator: std.mem.Allocator, limit: usize) ![]u8 {
-        var aw = std.Io.Writer.Allocating.init(allocator);
+    // stdin helpers
+    pub fn readLineAlloc(
+        self: *Io,
+        allocator: std.mem.Allocator,
+        limit: usize,
+    ) ![]u8 {
+        var aw = std.Io.AllocatingWriter.init(allocator);
         defer aw.deinit();
-        const w = &aw.writer;
+        const w: *std.Io.Writer = &aw.writer;
+
+        // streamDelimiterLimit writes the bytes before the delimiter into w.
+        // Use .limited(limit) to bound the logical line length.
         _ = try self.inp.streamDelimiterLimit(w, '\n', .limited(limit));
-        return aw.written(); // slice owned by allocator
+
+        return aw.written(); // owned by allocator
     }
 
     pub fn flushAll(self: *Io) !void {

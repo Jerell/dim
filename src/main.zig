@@ -14,5 +14,4 @@ pub fn main() !void {
     const v = d.div(t);
 
     try io.printf("Usain Bolt speed: {f} m/s\n", .{v});
-    std.debug.print("{f}", .{v});
 }

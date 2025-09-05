@@ -17,7 +17,7 @@ pub fn main() !void {
 
     const u = dim.findUnitAllDynamic("m", null);
     if (u) |val| {
-        try io.printf("{s}\n", .{val.symbol});
+        try io.printf("{s}, dim {any}\n", .{ val.symbol, val.dim });
     } else {
         try io.printf("No unit\n", .{});
     }

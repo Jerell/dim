@@ -1,12 +1,13 @@
 const dim = @import("../root.zig");
+const si = @import("../registry/si.zig");
 
 pub const Units = struct {
     pub fn K(v: f64) dim.Quantity(dim.DIM.Temperature) {
-        return .{ .value = v, .is_delta = false };
+        return si.K.from(v);
     }
 
     pub fn C(v: f64) dim.Quantity(dim.DIM.Temperature) {
-        return .{ .value = v + 273.15, .is_delta = false };
+        return si.C.from(v);
     }
 
     pub fn F(v: f64) dim.Quantity(dim.DIM.Temperature) {

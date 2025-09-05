@@ -14,4 +14,8 @@ pub fn main() !void {
     const v = d.div(t);
 
     try io.printf("Usain Bolt speed: {f} m/s\n", .{v});
+
+    const u = dim.findUnitAllDynamic("m", null);
+
+    try io.printf("{any}\n", .{u});
 }

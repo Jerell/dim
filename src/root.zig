@@ -4,22 +4,36 @@ pub const Dimension = @import("dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
 pub const DIM = @import("dimension.zig").DIM;
 pub const Unit = @import("unit.zig").Unit;
+const si = @import("registry/si.zig");
+const imperial = @import("registry/imperial.zig");
 
-const units = struct {
-    pub const pressure = @import("units/pressure.zig");
-    pub const temperature = @import("units/temperature.zig");
-};
+pub fn findUnit(registry: []const Unit, symbol: []const u8) ?Unit {
+    for (registry) |u| {
+        if (std.mem.eql(u8, u.symbol, symbol)) return u;
+    }
+    return null;
+}
 
-pub const Units = struct {
-    // Pressure
-    pub const Pa = units.pressure.Units.Pa;
-    pub const bar = units.pressure.Units.bar;
+pub fn findUnitAll(symbol: []const u8) ?Unit {
+    if (findUnit(&si.Registry, symbol)) |u| return u;
+    if (findUnit(&imperial.Registry, symbol)) |u| return u;
+    return null;
+}
 
-    // Temperature
-    pub const K = units.temperature.Units.K;
-    pub const C = units.temperature.Units.C;
-    pub const F = units.temperature.Units.F;
-};
+pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const []const Unit) ?Unit {
+    // Search built-in registries first
+    if (findUnit(&si.Registry, symbol)) |u| return u;
+    if (findUnit(&imperial.Registry, symbol)) |u| return u;
+
+    // Then search user-supplied registries if provided
+    if (extra) |regs| {
+        for (regs) |reg| {
+            if (findUnit(reg, symbol)) |u| return u;
+        }
+    }
+
+    return null;
+}
 
 test "basic dimensional arithmetic" {
     const LengthQ = Quantity(DIM.Length);

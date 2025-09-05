@@ -4,14 +4,15 @@ const Quantity = @import("quantity.zig").Quantity;
 pub const Unit = struct {
     dim: Dimension,
     scale: f64,
+    offset: f64 = 0.0,
     symbol: []const u8,
 
     pub fn toCanonical(self: Unit, v: f64) f64 {
-        return v * self.scale;
+        return (v + self.offset) * self.scale;
     }
 
     pub fn fromCanonical(self: Unit, v: f64) f64 {
-        return v / self.scale;
+        return v / self.scale - self.offset;
     }
 
     pub fn from(self: Unit, v: f64) Quantity(self.dim) {

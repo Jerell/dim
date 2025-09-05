@@ -30,7 +30,7 @@ pub const N = dim.Unit{ .dim = dim.DIM.Force, .scale = 1.0, .symbol = "N" };
 pub const mps = dim.Unit{ .dim = dim.DIM.Velocity, .scale = 1.0, .symbol = "m/s" };
 pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = "m/s²" };
 
-const units = [_]dim.Unit{
+pub const Units = [_]dim.Unit{
     m,    km, cm, mm,
     g,    kg, s,  min,
     h,    A,  K,  C,
@@ -71,7 +71,7 @@ const prefixes = [_]dim.Prefix{
 };
 
 pub const Registry = dim.UnitRegistry{
-    .units = &units,
+    .units = &Units,
     .aliases = &aliases,
     .prefixes = &prefixes,
 };

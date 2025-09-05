@@ -16,7 +16,7 @@ pub const h = dim.Unit{ .dim = dim.DIM.Time, .scale = 3600.0, .symbol = "h" };
 
 pub const psi = dim.Unit{ .dim = dim.DIM.Pressure, .scale = 6894.757, .symbol = "psi" };
 
-const units = [_]dim.Unit{ ft, in, yd, mi, lb, oz, F, s, min, h, psi };
+pub const Units = [_]dim.Unit{ ft, in, yd, mi, lb, oz, F, s, min, h, psi };
 const aliases = [_]dim.Alias{
     .{ .symbol = "F", .target = &F },
     .{ .symbol = "degF", .target = &F },
@@ -24,7 +24,7 @@ const aliases = [_]dim.Alias{
 const prefixes = [_]dim.Prefix{};
 
 pub const Registry = dim.UnitRegistry{
-    .units = &units,
+    .units = &Units,
     .aliases = &aliases,
     .prefixes = &prefixes,
 };

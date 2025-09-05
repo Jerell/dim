@@ -20,6 +20,7 @@ $ dim 5 m / 2 s in km/h
 ## ✨ Features (planned)
 
 - **Library (`dim`)**
+
   - Strongly typed `Quantity` type parameterized by dimension.
   - Compile-time dimensional analysis (safe add/sub, derived units from mul/div).
   - Canonical SI storage (Pa, K, m, s, …).
@@ -45,6 +46,7 @@ $ dim 5 m / 2 s in km/h
 ## 📚 Roadmap
 
 ### Library
+
 - [x] Define base dimensions (M, L, T, Θ).
 - [x] Implement `Quantity(Dim, Registry)` generic type.
 - [x] Add unit constructors for common units (Pa, bar, K, °C, m, s).
@@ -59,6 +61,7 @@ $ dim 5 m / 2 s in km/h
   - [x] CGS (cm, g, dynes, …).
 
 ### CLI
+
 - [ ] Tokenizer for numbers, units, operators, `in`.
 - [ ] Parser for arithmetic expressions + optional `in <unit>`.
 - [ ] AST nodes:
@@ -77,28 +80,41 @@ $ dim 5 m / 2 s in km/h
 ## 🛠️ Example Usage
 
 ### Library
+
 ```zig
 const std = @import("std");
 const dim = @import("dim");
+const Io = @import("./io.zig").Io;
 
-pub fn main() void {
-    const P = dim.Quantity(dim.Pressure, dim.SI);
-    const T = dim.Quantity(dim.Temperature, dim.SI);
+pub fn main() !void {
+    var io = Io.init();
+    defer io.flushAll() catch |e| std.debug.print("flush error: {s}\n", .{@errorName(e)});
 
-    const p1 = dim.bar(1.0);       // 1 bar
-    const p2 = dim.Pa(50000.0);    // 50 kPa
-    const p3 = p1.add(p2);      // 150 kPa
+    const Length = dim.Quantity(dim.DIM.Length);
+    const Time = dim.Quantity(dim.DIM.Time);
 
-    const t1 = dim.C(20.0);        // 20 °C
-    const t2 = dim.K(300.0);       // 300 K
-    const t3 = t1.add(t2);      // 583.15 K
+    // perform operations with quantities
+    const d = Length.init(100.0);
+    const t = Time.init(9.58);
+    const v = d.div(t);
 
-    std.debug.print("p3 = {f}\n", .{p3}); // auto prefix → "150.000 kPa"
-    std.debug.print("t3 = {f}\n", .{t3}); // "583.150 K"
+    // print a unit
+    try io.printf("speed: {f} m/s\n", .{v});
+    // print a unit with a chosen unit registry and formatting mode
+    try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
+
+    // search for a unit
+    const u = dim.findUnitAllDynamic("erg", null);
+    if (u) |val| {
+        try io.printf("{s}, dim {any}\n", .{ val.symbol, val.dim });
+    } else {
+        try io.printf("No unit\n", .{});
+    }
 }
 ```
 
 ### CLI
+
 ```bash
 $ dim 10 celsius + 20 fahrenheit
 293.15 K

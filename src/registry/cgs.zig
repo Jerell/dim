@@ -15,7 +15,7 @@ pub const Ba = dim.Unit{ .dim = dim.DIM.Pressure, .scale = 0.1, .symbol = "Ba" }
 pub const P = dim.Unit{ .dim = dim.DIM.Viscosity, .scale = 0.1, .symbol = "P" }; // poise
 pub const St = dim.Unit{ .dim = dim.DIM.KinematicViscosity, .scale = 1e-4, .symbol = "St" }; // stokes
 
-const units = [_]dim.Unit{
+pub const Units = [_]dim.Unit{
     cm,  mm,
     g,   s,
     dyn, erg,
@@ -27,7 +27,7 @@ const aliases = [_]dim.Alias{}; // no aliases for now
 const prefixes = [_]dim.Prefix{}; // CGS doesn’t use SI prefixes
 
 pub const Registry = dim.UnitRegistry{
-    .units = &units,
+    .units = &Units,
     .aliases = &aliases,
     .prefixes = &prefixes,
 };

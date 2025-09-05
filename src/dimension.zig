@@ -1,3 +1,5 @@
+const Quantity = @import("quantity.zig").Quantity;
+
 pub const Dimension = struct {
     L: i32, // length
     M: i32, // mass

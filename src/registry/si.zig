@@ -16,7 +16,6 @@ pub const A = dim.Unit{ .dim = dim.DIM.Current, .scale = 1.0, .symbol = "A" };
 
 pub const K = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 0.0, .symbol = "K" };
 pub const C = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 273.15, .symbol = "C" };
-pub const F = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 5.0 / 9.0, .offset = 459.67 * 5.0 / 9.0, .symbol = "F" };
 
 pub const mol = dim.Unit{ .dim = dim.DIM.Amount, .scale = 1.0, .symbol = "mol" };
 pub const cd = dim.Unit{ .dim = dim.DIM.Luminous, .scale = 1.0, .symbol = "cd" };
@@ -32,12 +31,12 @@ pub const mps = dim.Unit{ .dim = dim.DIM.Velocity, .scale = 1.0, .symbol = "m/s"
 pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = "m/s²" };
 
 const units = [_]dim.Unit{
-    m,   km,   cm, mm,
-    g,   kg,   s,  min,
-    h,   A,    K,  C,
-    F,   mol,  cd, Pa,
-    bar, J,    W,  N,
-    mps, mps2,
+    m,    km, cm, mm,
+    g,    kg, s,  min,
+    h,    A,  K,  C,
+    mol,  cd, Pa, bar,
+    J,    W,  N,  mps,
+    mps2,
 };
 
 const aliases = [_]dim.Alias{

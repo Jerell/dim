@@ -15,7 +15,7 @@ pub const h = dim.Unit{ .dim = dim.DIM.Time, .scale = 3600.0, .symbol = "h" };
 pub const A = dim.Unit{ .dim = dim.DIM.Current, .scale = 1.0, .symbol = "A" };
 
 pub const K = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 0.0, .symbol = "K" };
-pub const C = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 273.15, .symbol = "C" };
+pub const C = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 273.15, .symbol = "°C" };
 
 pub const mol = dim.Unit{ .dim = dim.DIM.Amount, .scale = 1.0, .symbol = "mol" };
 pub const cd = dim.Unit{ .dim = dim.DIM.Luminous, .scale = 1.0, .symbol = "cd" };
@@ -42,6 +42,9 @@ const units = [_]dim.Unit{
 const aliases = [_]dim.Alias{
     .{ .symbol = "Newton", .target = &N },
     .{ .symbol = "sec", .target = &s },
+    .{ .symbol = "m/s2", .target = &mps2 },
+    .{ .symbol = "C", .target = &C }, // allow "10 C" input
+    .{ .symbol = "degC", .target = &C }, // allow "10 degC"
 };
 
 const prefixes = [_]dim.Prefix{

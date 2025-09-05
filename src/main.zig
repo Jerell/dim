@@ -19,7 +19,6 @@ pub fn main() !void {
     const u = dim.findUnitAllDynamic("erg", null);
     if (u) |val| {
         try io.printf("{s}, dim {any}\n", .{ val.symbol, val.dim });
-        // const a = u.?.from(1);
     } else {
         try io.printf("No unit\n", .{});
     }

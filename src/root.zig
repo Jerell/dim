@@ -12,10 +12,6 @@ const _si = @import("registry/si.zig");
 const _imperial = @import("registry/imperial.zig");
 const _cgs = @import("registry/cgs.zig");
 
-pub const UnitError = error{
-    UnknownUnit,
-};
-
 /// Search across all built-in registries
 pub fn findUnitAll(symbol: []const u8) ?Unit {
     if (_si.Registry.find(symbol)) |u| return u;

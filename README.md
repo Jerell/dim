@@ -49,10 +49,10 @@ $ dim 5 m / 2 s in km/h
 - [x] Implement `Quantity(Dim, Registry)` generic type.
 - [x] Add unit constructors for common units (Pa, bar, K, °C, m, s).
 - [x] Implement arithmetic (`add`, `sub`, `mul`, `div`) with compile-time dimensional analysis.
-- [ ] Implement formatting:
-  - [ ] SI prefixes (auto, none, scientific, engineering).
-  - [ ] Derived unit aliases (N, J, W, Hz).
-- [ ] Implement configurable `UnitRegistry` (aliases + prefixes).
+- [x] Implement formatting:
+  - [x] SI prefixes (auto, none, scientific, engineering).
+  - [x] Derived unit aliases (N, J, W, Hz).
+- [x] Implement configurable `UnitRegistry` (aliases + prefixes).
 - [x] Provide built-in registries:
   - [x] SI (default).
   - [x] Imperial (psi, °F, miles, …).

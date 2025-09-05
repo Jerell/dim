@@ -4,36 +4,50 @@ pub const Dimension = @import("dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
 pub const DIM = @import("dimension.zig").DIM;
 pub const Unit = @import("unit.zig").Unit;
-const si = @import("registry/si.zig");
-const imperial = @import("registry/imperial.zig");
+pub const Alias = @import("unit.zig").Alias;
+pub const Prefix = @import("unit.zig").Prefix;
+pub const UnitRegistry = @import("unit.zig").UnitRegistry;
 
-pub fn findUnit(registry: []const Unit, symbol: []const u8) ?Unit {
-    for (registry) |u| {
-        if (std.mem.eql(u8, u.symbol, symbol)) return u;
-    }
-    return null;
-}
+const _si = @import("registry/si.zig");
+const _imperial = @import("registry/imperial.zig");
+const _cgs = @import("registry/cgs.zig");
 
+/// Search across all built-in registries
 pub fn findUnitAll(symbol: []const u8) ?Unit {
-    if (findUnit(&si.Registry, symbol)) |u| return u;
-    if (findUnit(&imperial.Registry, symbol)) |u| return u;
+    if (_si.Registry.find(symbol)) |u| return u;
+    if (_imperial.Registry.find(symbol)) |u| return u;
+    if (_cgs.Registry.find(symbol)) |u| return u;
     return null;
 }
 
-pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const []const Unit) ?Unit {
+/// Search across built-in registries + optional user-supplied registries
+pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const UnitRegistry) ?Unit {
     // Search built-in registries first
-    if (findUnit(&si.Registry, symbol)) |u| return u;
-    if (findUnit(&imperial.Registry, symbol)) |u| return u;
+    if (findUnitAll(symbol)) |u| return u;
 
     // Then search user-supplied registries if provided
     if (extra) |regs| {
         for (regs) |reg| {
-            if (findUnit(reg, symbol)) |u| return u;
+            if (reg.find(symbol)) |u| return u;
         }
     }
 
     return null;
 }
+
+/// Re-export ergonomic constructors
+pub const Units = struct {
+    pub const si = _si.Units;
+    pub const imperial = _imperial.Units;
+    pub const cgs = _cgs.Units;
+};
+
+/// Re-export full registries
+pub const Registries = struct {
+    pub const si = _si.Registry;
+    pub const imperial = _imperial.Registry;
+    pub const cgs = _cgs.Registry;
+};
 
 test "basic dimensional arithmetic" {
     const LengthQ = Quantity(DIM.Length);
@@ -46,7 +60,6 @@ test "basic dimensional arithmetic" {
 
     try std.testing.expectApproxEqAbs(10.0, v.value, 1e-9);
     comptime {
-        // Ensure type is correct at compile time
         const ResultQ = @TypeOf(v);
         _ = @as(SpeedQ, ResultQ{ .value = 0.0, .is_delta = false });
     }
@@ -63,7 +76,6 @@ test "force = mass * acceleration" {
 
     comptime {
         const ResultQ = @TypeOf(f);
-        // If ResultQ is not ForceQ, the following cast will fail at comptime:
         _ = @as(ForceQ, ResultQ{ .value = 0.0, .is_delta = false });
     }
 
@@ -73,14 +85,11 @@ test "force = mass * acceleration" {
 test "temperature: abs + delta -> abs" {
     const TempQ = Quantity(DIM.Temperature);
 
-    // 10 °C absolute = 283.15 K
-    const t_abs = TempQ.init(10.0 + 273.15);
-
-    // 20 °F delta => 20 * 5/9 K = 11.111... K
-    const dF_in_K = 20.0 * 5.0 / 9.0;
+    const t_abs = TempQ.init(10.0 + 273.15); // 10 °C absolute
+    const dF_in_K = 20.0 * 5.0 / 9.0; // 20 °F delta
     const t_delta = TempQ.init(dF_in_K);
 
-    const sum = t_abs.add(t_delta); // abs + delta -> abs
+    const sum = t_abs.add(t_delta);
     try std.testing.expect(!sum.is_delta);
     try std.testing.expectApproxEqAbs(283.15 + dF_in_K, sum.value, 1e-9);
 }
@@ -88,13 +97,10 @@ test "temperature: abs + delta -> abs" {
 test "temperature: delta + abs -> abs" {
     const TempQ = Quantity(DIM.Temperature);
 
-    // 300 K absolute
     const t_abs = TempQ.init(300.0);
+    const t_delta = TempQ.init(10.0); // 10 °C delta = 10 K
 
-    // 10 °C delta = 10 K
-    const t_delta = TempQ.init(10.0);
-
-    const sum = t_delta.add(t_abs); // delta + abs -> abs
+    const sum = t_delta.add(t_abs);
     try std.testing.expect(!sum.is_delta);
     try std.testing.expectApproxEqAbs(310.0, sum.value, 1e-9);
 }
@@ -102,12 +108,10 @@ test "temperature: delta + abs -> abs" {
 test "temperature: delta + delta -> delta" {
     const TempQ = Quantity(DIM.Temperature);
 
-    // 10 °C delta = 10 K
     const d1 = TempQ{ .value = 10.0, .is_delta = true };
-    // 18 °F delta = 10 K
     const d2 = TempQ{ .value = 18.0 * 5.0 / 9.0, .is_delta = true };
 
-    const dsum = d1.add(d2); // delta + delta -> delta
+    const dsum = d1.add(d2);
     try std.testing.expect(dsum.is_delta);
     try std.testing.expectApproxEqAbs(20.0, dsum.value, 1e-9);
 }
@@ -115,12 +119,10 @@ test "temperature: delta + delta -> delta" {
 test "temperature: abs - abs -> delta" {
     const TempQ = Quantity(DIM.Temperature);
 
-    // 310 K absolute
     const a = TempQ.init(310.0);
-    // 20 °C absolute = 293.15 K
     const b = TempQ.init(20.0 + 273.15);
 
-    const diff = a.sub(b); // abs - abs -> delta
+    const diff = a.sub(b);
     try std.testing.expect(diff.is_delta);
     try std.testing.expectApproxEqAbs(16.85, diff.value, 1e-9);
 }
@@ -128,12 +130,10 @@ test "temperature: abs - abs -> delta" {
 test "temperature: abs - delta -> abs" {
     const TempQ = Quantity(DIM.Temperature);
 
-    // 300 K absolute
     const a = TempQ.init(300.0);
-    // 20 °C delta = 20 K
     const d = TempQ{ .value = 20.0, .is_delta = true };
 
-    const res = a.sub(d); // abs - delta -> abs
+    const res = a.sub(d);
     try std.testing.expect(!res.is_delta);
     try std.testing.expectApproxEqAbs(280.0, res.value, 1e-9);
 }

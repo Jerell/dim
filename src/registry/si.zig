@@ -1,6 +1,5 @@
 const dim = @import("../root.zig");
 
-/// SI Units
 pub const m = dim.Unit{ .dim = dim.DIM.Length, .scale = 1.0, .symbol = "m" };
 pub const km = dim.Unit{ .dim = dim.DIM.Length, .scale = 1000.0, .symbol = "km" };
 pub const cm = dim.Unit{ .dim = dim.DIM.Length, .scale = 0.01, .symbol = "cm" };
@@ -20,7 +19,6 @@ pub const C = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 1.0, .offset = 273.
 pub const F = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 5.0 / 9.0, .offset = 459.67 * 5.0 / 9.0, .symbol = "F" };
 
 pub const mol = dim.Unit{ .dim = dim.DIM.Amount, .scale = 1.0, .symbol = "mol" };
-
 pub const cd = dim.Unit{ .dim = dim.DIM.Luminous, .scale = 1.0, .symbol = "cd" };
 
 pub const Pa = dim.Unit{ .dim = dim.DIM.Pressure, .scale = 1.0, .symbol = "Pa" };
@@ -30,8 +28,7 @@ pub const J = dim.Unit{ .dim = dim.DIM.Energy, .scale = 1.0, .symbol = "J" };
 pub const W = dim.Unit{ .dim = dim.DIM.Power, .scale = 1.0, .symbol = "W" };
 pub const N = dim.Unit{ .dim = dim.DIM.Force, .scale = 1.0, .symbol = "N" };
 
-/// Array of all SI units for runtime lookup
-pub const Registry = [_]dim.Unit{
+const units = [_]dim.Unit{
     m,   km,  cm, mm,
     g,   kg,  s,  min,
     h,   A,   K,  C,
@@ -39,74 +36,36 @@ pub const Registry = [_]dim.Unit{
     bar, J,   W,  N,
 };
 
-/// Ergonomic constructors
-pub const Units = struct {
-    pub fn m(v: f64) dim.Quantity(dim.DIM.Length) {
-        return @This().m.from(v);
-    }
-    pub fn km(v: f64) dim.Quantity(dim.DIM.Length) {
-        return @This().km.from(v);
-    }
-    pub fn cm(v: f64) dim.Quantity(dim.DIM.Length) {
-        return @This().cm.from(v);
-    }
-    pub fn mm(v: f64) dim.Quantity(dim.DIM.Length) {
-        return @This().mm.from(v);
-    }
+const aliases = [_]dim.Alias{
+    .{ .symbol = "Newton", .target = &N },
+    .{ .symbol = "sec", .target = &s },
+};
 
-    pub fn g(v: f64) dim.Quantity(dim.DIM.Mass) {
-        return @This().g.from(v);
-    }
-    pub fn kg(v: f64) dim.Quantity(dim.DIM.Mass) {
-        return @This().kg.from(v);
-    }
+const prefixes = [_]dim.Prefix{
+    .{ .symbol = "Y", .factor = 1e24 },
+    .{ .symbol = "Z", .factor = 1e21 },
+    .{ .symbol = "E", .factor = 1e18 },
+    .{ .symbol = "P", .factor = 1e15 },
+    .{ .symbol = "T", .factor = 1e12 },
+    .{ .symbol = "G", .factor = 1e9 },
+    .{ .symbol = "M", .factor = 1e6 },
+    .{ .symbol = "k", .factor = 1e3 },
+    .{ .symbol = "h", .factor = 1e2 },
+    .{ .symbol = "da", .factor = 1e1 },
+    .{ .symbol = "d", .factor = 1e-1 },
+    .{ .symbol = "c", .factor = 1e-2 },
+    .{ .symbol = "m", .factor = 1e-3 },
+    .{ .symbol = "µ", .factor = 1e-6 },
+    .{ .symbol = "n", .factor = 1e-9 },
+    .{ .symbol = "p", .factor = 1e-12 },
+    .{ .symbol = "f", .factor = 1e-15 },
+    .{ .symbol = "a", .factor = 1e-18 },
+    .{ .symbol = "z", .factor = 1e-21 },
+    .{ .symbol = "y", .factor = 1e-24 },
+};
 
-    pub fn s(v: f64) dim.Quantity(dim.DIM.Time) {
-        return @This().s.from(v);
-    }
-    pub fn min(v: f64) dim.Quantity(dim.DIM.Time) {
-        return @This().min.from(v);
-    }
-    pub fn h(v: f64) dim.Quantity(dim.DIM.Time) {
-        return @This().h.from(v);
-    }
-
-    pub fn A(v: f64) dim.Quantity(dim.DIM.Current) {
-        return @This().A.from(v);
-    }
-
-    pub fn K(v: f64) dim.Quantity(dim.DIM.Temperature) {
-        return @This().K.from(v);
-    }
-    pub fn C(v: f64) dim.Quantity(dim.DIM.Temperature) {
-        return @This().C.from(v);
-    }
-    pub fn F(v: f64) dim.Quantity(dim.DIM.Temperature) {
-        return @This().F.from(v);
-    }
-
-    pub fn mol(v: f64) dim.Quantity(dim.DIM.Amount) {
-        return @This().mol.from(v);
-    }
-
-    pub fn cd(v: f64) dim.Quantity(dim.DIM.Luminous) {
-        return @This().cd.from(v);
-    }
-
-    pub fn Pa(v: f64) dim.Quantity(dim.DIM.Pressure) {
-        return @This().Pa.from(v);
-    }
-    pub fn bar(v: f64) dim.Quantity(dim.DIM.Pressure) {
-        return @This().bar.from(v);
-    }
-
-    pub fn J(v: f64) dim.Quantity(dim.DIM.Energy) {
-        return @This().J.from(v);
-    }
-    pub fn W(v: f64) dim.Quantity(dim.DIM.Power) {
-        return @This().W.from(v);
-    }
-    pub fn N(v: f64) dim.Quantity(dim.DIM.Force) {
-        return @This().N.from(v);
-    }
+pub const Registry = dim.UnitRegistry{
+    .units = &units,
+    .aliases = &aliases,
+    .prefixes = &prefixes,
 };

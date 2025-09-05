@@ -64,4 +64,7 @@ pub const DIM = struct {
     pub const Charge = Dimension.init(0, 0, 1, 1, 0, 0, 0); // T I
     pub const Voltage = Dimension.init(2, 1, -3, -1, 0, 0, 0); // M L^2 T^-3 I^-1
     pub const Resistance = Dimension.init(2, 1, -3, -2, 0, 0, 0); // M L^2 T^-3 I^-2
+
+    pub const Viscosity = Dimension.init(-1, 1, -1, 0, 0, 0, 0); // M L^-1 T^-1
+    pub const KinematicViscosity = Dimension.init(2, 0, -1, 0, 0, 0, 0); // L^2 T^-1
 };

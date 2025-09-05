@@ -45,18 +45,18 @@ $ dim 5 m / 2 s in km/h
 ## 📚 Roadmap
 
 ### Library
-- [ ] Define base dimensions (M, L, T, Θ).
-- [ ] Implement `Quantity(Dim, Registry)` generic type.
-- [ ] Add unit constructors for common units (Pa, bar, K, °C, m, s).
-- [ ] Implement arithmetic (`add`, `sub`, `mul`, `div`) with compile-time dimensional analysis.
+- [x] Define base dimensions (M, L, T, Θ).
+- [x] Implement `Quantity(Dim, Registry)` generic type.
+- [x] Add unit constructors for common units (Pa, bar, K, °C, m, s).
+- [x] Implement arithmetic (`add`, `sub`, `mul`, `div`) with compile-time dimensional analysis.
 - [ ] Implement formatting:
   - [ ] SI prefixes (auto, none, scientific, engineering).
   - [ ] Derived unit aliases (N, J, W, Hz).
 - [ ] Implement configurable `UnitRegistry` (aliases + prefixes).
-- [ ] Provide built-in registries:
-  - [ ] SI (default).
-  - [ ] Imperial (psi, °F, miles, …).
-  - [ ] CGS (cm, g, dynes, …).
+- [x] Provide built-in registries:
+  - [x] SI (default).
+  - [x] Imperial (psi, °F, miles, …).
+  - [x] CGS (cm, g, dynes, …).
 
 ### CLI
 - [ ] Tokenizer for numbers, units, operators, `in`.

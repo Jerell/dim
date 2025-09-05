@@ -14,8 +14,9 @@ pub fn main() !void {
     const v = d.div(t);
 
     try io.printf("Usain Bolt speed: {f} m/s\n", .{v});
+    try io.printf("Usain Bolt speed: {f}\n", .{v.With(dim.Registries.si, .engineering)});
 
-    const u = dim.findUnitAllDynamic("m", null);
+    const u = dim.findUnitAllDynamic("erg", null);
     if (u) |val| {
         try io.printf("{s}, dim {any}\n", .{ val.symbol, val.dim });
     } else {

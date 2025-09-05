@@ -1,5 +1,7 @@
 const std = @import("std");
 const Dimension = @import("dimension.zig").Dimension;
+const UnitRegistry = @import("unit.zig").UnitRegistry;
+const Format = @import("format.zig");
 
 const QuantityError = error{
     AbsPlusAbsTemperature,
@@ -40,6 +42,28 @@ pub fn Quantity(comptime Dim: Dimension) type {
                 try writer.print("{d}", .{self.value});
             }
         }
+
+        /// Wrapper type for custom formatting
+        pub fn With(self: Quantity(Dim), reg: UnitRegistry, mode: Format.FormatMode) FormatWrapper {
+            return .{ .q = self, .reg = reg, .mode = mode };
+        }
+
+        pub const FormatWrapper = struct {
+            q: Quantity(Dim),
+            reg: UnitRegistry,
+            mode: Format.FormatMode,
+
+            pub fn format(self: @This(), writer: anytype) !void {
+                try @import("format.zig").formatQuantity(
+                    writer,
+                    self.q.value,
+                    @TypeOf(self.q).dim,
+                    self.q.is_delta,
+                    self.reg,
+                    self.mode,
+                );
+            }
+        };
 
         pub fn add(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
             if (comptime isTemperatureDim(Dim)) {

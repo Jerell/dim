@@ -23,7 +23,7 @@ pub fn formatQuantity(
         }
     }
     if (base == null) {
-        return writer.print("{d} [unknown unit]", .{value});
+        return writer.print("{d} [{any}]", .{ value, dim });
     }
 
     const u = base.?;

@@ -28,12 +28,16 @@ pub const J = dim.Unit{ .dim = dim.DIM.Energy, .scale = 1.0, .symbol = "J" };
 pub const W = dim.Unit{ .dim = dim.DIM.Power, .scale = 1.0, .symbol = "W" };
 pub const N = dim.Unit{ .dim = dim.DIM.Force, .scale = 1.0, .symbol = "N" };
 
+pub const mps = dim.Unit{ .dim = dim.DIM.Velocity, .scale = 1.0, .symbol = "m/s" };
+pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = "m/s²" };
+
 const units = [_]dim.Unit{
-    m,   km,  cm, mm,
-    g,   kg,  s,  min,
-    h,   A,   K,  C,
-    F,   mol, cd, Pa,
-    bar, J,   W,  N,
+    m,   km,   cm, mm,
+    g,   kg,   s,  min,
+    h,   A,    K,  C,
+    F,   mol,  cd, Pa,
+    bar, J,    W,  N,
+    mps, mps2,
 };
 
 const aliases = [_]dim.Alias{

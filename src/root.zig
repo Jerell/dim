@@ -140,6 +140,14 @@ pub fn Quantity(comptime Dim: Dimension) type {
             }
             return .{ .value = self.value / other.value, .is_delta = false };
         }
+
+        pub fn scale(self: Quantity(Dim), k: f64) Quantity(Dim) {
+            return .{ .value = self.value * k };
+        }
+
+        pub fn unscale(self: Quantity(Dim), k: f64) Quantity(Dim) {
+            return .{ .value = self.value / k };
+        }
     };
 }
 

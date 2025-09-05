@@ -16,6 +16,9 @@ pub fn main() !void {
     try io.printf("Usain Bolt speed: {f} m/s\n", .{v});
 
     const u = dim.findUnitAllDynamic("m", null);
-
-    try io.printf("{any}\n", .{u});
+    if (u) |val| {
+        try io.printf("{s}\n", .{val.symbol});
+    } else {
+        try io.printf("No unit\n", .{});
+    }
 }

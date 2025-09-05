@@ -1,6 +1,6 @@
 const std = @import("std");
 const dim = @import("dim");
-const Io = @import("./io.zig").Io;
+const Io = @import("./Io.zig").Io;
 
 pub fn main() !void {
     var io = Io.init();

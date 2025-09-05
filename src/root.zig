@@ -1,16 +1,16 @@
 const std = @import("std");
 
-pub const Dimension = @import("dimension.zig").Dimension;
-pub const Quantity = @import("quantity.zig").Quantity;
-pub const DIM = @import("dimension.zig").DIM;
-pub const Unit = @import("unit.zig").Unit;
-pub const Alias = @import("unit.zig").Alias;
-pub const Prefix = @import("unit.zig").Prefix;
-pub const UnitRegistry = @import("unit.zig").UnitRegistry;
+pub const Dimension = @import("Dimension.zig").Dimension;
+pub const Quantity = @import("Quantity.zig").Quantity;
+pub const DIM = @import("Dimension.zig").DIM;
+pub const Unit = @import("Unit.zig").Unit;
+pub const Alias = @import("Unit.zig").Alias;
+pub const Prefix = @import("Unit.zig").Prefix;
+pub const UnitRegistry = @import("Unit.zig").UnitRegistry;
 
-const _si = @import("registry/si.zig");
-const _imperial = @import("registry/imperial.zig");
-const _cgs = @import("registry/cgs.zig");
+const _si = @import("registry/Si.zig");
+const _imperial = @import("registry/Imperial.zig");
+const _cgs = @import("registry/Cgs.zig");
 
 /// Search across all built-in registries
 pub fn findUnitAll(symbol: []const u8) ?Unit {

@@ -1,7 +1,7 @@
 const std = @import("std");
-const Unit = @import("unit.zig").Unit;
-const UnitRegistry = @import("unit.zig").UnitRegistry;
-const Dimension = @import("dimension.zig").Dimension;
+const Unit = @import("Unit.zig").Unit;
+const UnitRegistry = @import("Unit.zig").UnitRegistry;
+const Dimension = @import("Dimension.zig").Dimension;
 
 pub const FormatMode = enum { auto, none, scientific, engineering };
 

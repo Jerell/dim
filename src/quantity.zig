@@ -1,7 +1,7 @@
 const std = @import("std");
-const Dimension = @import("dimension.zig").Dimension;
-const UnitRegistry = @import("unit.zig").UnitRegistry;
-const Format = @import("format.zig");
+const Dimension = @import("Dimension.zig").Dimension;
+const UnitRegistry = @import("Unit.zig").UnitRegistry;
+const Format = @import("Format.zig");
 
 const QuantityError = error{
     AbsPlusAbsTemperature,
@@ -54,7 +54,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
             mode: Format.FormatMode,
 
             pub fn format(self: @This(), writer: anytype) !void {
-                try @import("format.zig").formatQuantity(
+                try Format.formatQuantity(
                     writer,
                     self.q.value,
                     @TypeOf(self.q).dim,

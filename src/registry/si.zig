@@ -45,6 +45,10 @@ const aliases = [_]dim.Alias{
     .{ .symbol = "m/s2", .target = &mps2 },
     .{ .symbol = "C", .target = &C }, // allow "10 C" input
     .{ .symbol = "degC", .target = &C }, // allow "10 degC"
+    .{ .symbol = "celsius", .target = &C },
+    .{ .symbol = "Celsius", .target = &C },
+    .{ .symbol = "kelvin", .target = &K },
+    .{ .symbol = "Kelvin", .target = &K },
 };
 
 const prefixes = [_]dim.Prefix{

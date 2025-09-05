@@ -20,6 +20,8 @@ pub const Units = [_]dim.Unit{ ft, in, yd, mi, lb, oz, F, s, min, h, psi };
 const aliases = [_]dim.Alias{
     .{ .symbol = "F", .target = &F },
     .{ .symbol = "degF", .target = &F },
+    .{ .symbol = "Fahrenheit", .target = &F },
+    .{ .symbol = "fahrenheit", .target = &F },
 };
 const prefixes = [_]dim.Prefix{};
 

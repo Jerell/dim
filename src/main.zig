@@ -18,7 +18,7 @@ pub fn main() !void {
 
     const u = dim.findUnitAllDynamic("km", null);
     if (u) |unit| {
-        try io.printf("{f}\n", .{d.AsUnit(unit, .none)});
+        try io.printf("{f}\n", .{d.AsUnit(unit, .auto)});
     } else {
         try io.printf("No unit\n", .{});
     }

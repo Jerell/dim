@@ -97,25 +97,6 @@ pub fn formatQuantityAsUnit(
                 try writer.print("{s}{d:.3}e{d} {s}", .{ delta_prefix, scaled, eng_exp, display_unit.symbol });
             }
         },
-        .auto => {
-            if (val == 0.0) {
-                try writer.print("{s}0.000 {s}", .{ delta_prefix, display_unit.symbol });
-            } else {
-                var scaled_val = val;
-                var matched = false;
-                for (SiPrefixes) |p| {
-                    const v = val / p.factor;
-                    if (v >= 1.0 and v < 1000.0) {
-                        scaled_val = v;
-                        try writer.print("{s}{d:.3} {s}{s}", .{ delta_prefix, scaled_val, p.symbol, display_unit.symbol });
-                        matched = true;
-                        break;
-                    }
-                }
-                if (!matched) {
-                    try writer.print("{s}{d:.3} {s}", .{ delta_prefix, val, display_unit.symbol });
-                }
-            }
-        },
+        .auto => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, val, display_unit.symbol }),
     }
 }

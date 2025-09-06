@@ -16,7 +16,7 @@ const _cgs = @import("registry/Cgs.zig");
 pub const DisplayQuantity = struct {
     value: f64,
     dim: Dimension,
-    unit: []const u8, // preferred display unit symbol
+    unit: []u8, // preferred display unit symbol
     mode: Format.FormatMode = .none,
     is_delta: bool = false,
 

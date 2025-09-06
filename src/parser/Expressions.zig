@@ -249,6 +249,122 @@ pub const Display = struct {
     }
 };
 
+pub const UnitExpr = struct {
+    name: []const u8, // e.g. "m", "s"
+    exponent: i32 = 1,
+
+    pub fn print(self: UnitExpr, writer: *std.Io.Writer) !void {
+        if (self.exponent == 1) {
+            try writer.print("{s}", .{self.name});
+        } else {
+            try writer.print("{s}^{d}", .{ self.name, self.exponent });
+        }
+    }
+
+    pub fn evaluate(
+        self: *UnitExpr,
+        allocator: std.mem.Allocator,
+    ) RuntimeError!LiteralValue {
+        _ = allocator;
+
+        // Look up the unit definition
+        const u = dim.findUnitAllDynamic(self.name, null) orelse {
+            return RuntimeError.UndefinedVariable;
+        };
+
+        // Raise the unit’s dimension to the exponent
+        var dim_accum = u.dim;
+        if (self.exponent != 1) {
+            dim_accum = dim.Dimension.pow(u.dim, self.exponent);
+        }
+
+        // Return a DisplayQuantity with value=1.0 (pure unit factor)
+        return LiteralValue{ .display_quantity = dim.DisplayQuantity{
+            .value = 1.0,
+            .dim = dim_accum,
+            .unit = self.name,
+            .mode = .none,
+            .is_delta = false,
+        } };
+    }
+
+    pub fn toString(self: UnitExpr, allocator: std.mem.Allocator) ![]u8 {
+        if (self.exponent == 1) {
+            return try std.fmt.allocPrint(allocator, "{s}", .{self.name});
+        } else {
+            return try std.fmt.allocPrint(allocator, "{s}^{d}", .{ self.name, self.exponent });
+        }
+    }
+};
+
+pub const CompoundUnit = struct {
+    left: *Expr,
+    op: Token, // Star or Slash
+    right: *Expr,
+
+    pub fn print(self: CompoundUnit, writer: *std.Io.Writer) !void {
+        try self.left.print(writer);
+        try writer.print(" {s} ", .{self.op.lexeme});
+        try self.right.print(writer);
+    }
+
+    pub fn evaluate(
+        self: *CompoundUnit,
+        allocator: std.mem.Allocator,
+    ) RuntimeError!LiteralValue {
+        const left_val = try self.left.evaluate(allocator);
+        const right_val = try self.right.evaluate(allocator);
+
+        if (left_val != .display_quantity or right_val != .display_quantity) {
+            return RuntimeError.InvalidOperand;
+        }
+
+        const lq = left_val.display_quantity;
+        const rq = right_val.display_quantity;
+
+        var new_dim: dim.Dimension = undefined;
+        var new_val: f64 = undefined;
+
+        switch (self.op.type) {
+            .Star => {
+                new_dim = dim.Dimension.add(lq.dim, rq.dim);
+                new_val = lq.value * rq.value;
+            },
+            .Slash => {
+                new_dim = dim.Dimension.sub(lq.dim, rq.dim);
+                new_val = lq.value / rq.value;
+            },
+            else => return RuntimeError.UnsupportedOperator,
+        }
+
+        const unit_str = try self.toString(allocator);
+
+        return LiteralValue{
+            .display_quantity = dim.DisplayQuantity{
+                .value = new_val,
+                .dim = new_dim,
+                .unit = unit_str, // you could build a string like "m/s^2"
+                .mode = .none,
+                .is_delta = false,
+            },
+        };
+    }
+
+    pub fn toString(self: CompoundUnit, allocator: std.mem.Allocator) ![]u8 {
+        const left_str = try self.left.toUnitString(allocator);
+        defer allocator.free(left_str);
+
+        const right_str = try self.right.toUnitString(allocator);
+        defer allocator.free(right_str);
+
+        return try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{
+            left_str,
+            if (self.op.type == .Star) "*" else "/",
+            right_str,
+        });
+    }
+};
+
 pub const Expr = union(enum) {
     binary: Binary,
     unary: Unary,
@@ -256,6 +372,16 @@ pub const Expr = union(enum) {
     grouping: Grouping,
     unit: Unit,
     display: Display,
+    compound_unit: CompoundUnit,
+    unit_expr: UnitExpr,
+
+    pub fn toUnitString(self: *Expr, allocator: std.mem.Allocator) ![]u8 {
+        return switch (self.*) {
+            .unit_expr => |ue| ue.toString(allocator),
+            .compound_unit => |cu| cu.toString(allocator),
+            else => std.fmt.allocPrint(allocator, "<?>", .{}),
+        };
+    }
 
     pub fn evaluate(
         self: *Expr,
@@ -268,6 +394,8 @@ pub const Expr = union(enum) {
             .grouping => |*grouping| return grouping.evaluate(allocator),
             .unit => |*unit| return unit.evaluate(allocator),
             .display => |*display| return display.evaluate(allocator),
+            .compound_unit => |*cu| return cu.evaluate(allocator),
+            .unit_expr => |*ue| return ue.evaluate(allocator),
         }
     }
 
@@ -279,6 +407,8 @@ pub const Expr = union(enum) {
             .grouping => |grouping| return grouping.print(writer),
             .unit => |unit| return unit.print(writer),
             .display => |display| return display.print(writer),
+            .compound_unit => |cu| return cu.print(writer),
+            .unit_expr => |ue| return ue.print(writer),
         }
     }
 };

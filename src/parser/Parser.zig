@@ -163,25 +163,25 @@ pub const Parser = struct {
     fn primary(self: *Parser) !*ast_expr.Expr {
         if (self.match(&.{TokenType.Number})) {
             const lit = self.previous().literal.?;
-            const node_ptr = try self.allocator.create(ast_expr.Expr);
-            node_ptr.* = ast_expr.Expr{
+            const num_node = try self.allocator.create(ast_expr.Expr);
+            num_node.* = ast_expr.Expr{
                 .literal = ast_expr.Literal{ .value = ast_expr.LiteralValue{ .number = lit.number } },
             };
 
-            // optional unit after number
-            if (self.match(&.{TokenType.Identifier})) {
-                const unit_tok = self.previous();
-                const unit_node_ptr = try self.allocator.create(ast_expr.Expr);
-                unit_node_ptr.* = ast_expr.Expr{
+            // If a unit follows, parse a full unit expression
+            if (self.check(TokenType.Identifier)) {
+                const unit_expr = try self.parseUnitExpr();
+                const unit_node = try self.allocator.create(ast_expr.Expr);
+                unit_node.* = ast_expr.Expr{
                     .unit = ast_expr.Unit{
-                        .value = node_ptr,
-                        .unit_name = unit_tok.lexeme,
+                        .value = num_node,
+                        .unit_expr = unit_expr,
                     },
                 };
-                return unit_node_ptr;
+                return unit_node;
             }
 
-            return node_ptr;
+            return num_node;
         }
 
         if (self.match(&.{TokenType.LParen})) {
@@ -195,6 +195,48 @@ pub const Parser = struct {
         }
 
         return self.reportParseError(self.peek(), "Expect expression.");
+    }
+
+    fn parseUnitExpr(self: *Parser) !*ast_expr.Expr {
+        var expr_ptr = try self.parseUnitTerm();
+
+        while (self.match(&.{ TokenType.Star, TokenType.Slash })) {
+            const op = self.previous();
+            const right = try self.parseUnitTerm();
+
+            const node_ptr = try self.allocator.create(ast_expr.Expr);
+            node_ptr.* = ast_expr.Expr{
+                .compound_unit = ast_expr.CompoundUnit{
+                    .left = expr_ptr,
+                    .op = op,
+                    .right = right,
+                },
+            };
+            expr_ptr = node_ptr;
+        }
+
+        return expr_ptr;
+    }
+
+    fn parseUnitTerm(self: *Parser) !*ast_expr.Expr {
+        const id_tok = try self.consume(TokenType.Identifier, "Expected unit identifier");
+        var exponent: i32 = 1;
+
+        if (self.match(&.{TokenType.Caret})) {
+            const exp_tok = try self.consume(TokenType.Number, "Expected exponent after '^'");
+            const lit = exp_tok.literal.?;
+            if (lit != .number) return error.ExpectedToken;
+            exponent = @intFromFloat(lit.number);
+        }
+
+        const node_ptr = try self.allocator.create(ast_expr.Expr);
+        node_ptr.* = ast_expr.Expr{
+            .unit_expr = ast_expr.UnitExpr{
+                .name = id_tok.lexeme,
+                .exponent = exponent,
+            },
+        };
+        return node_ptr;
     }
 
     fn match(self: *Parser, types: []const TokenType) bool {

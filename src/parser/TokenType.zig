@@ -2,7 +2,6 @@ pub const TokenType = enum {
     Number,
     Dot,
     Comma,
-    Underscore,
     // units
     Identifier,
 

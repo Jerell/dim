@@ -13,11 +13,14 @@ const _si = @import("registry/Si.zig");
 const _imperial = @import("registry/Imperial.zig");
 const _cgs = @import("registry/Cgs.zig");
 
-pub const AnyQuantity = struct {
+pub const DisplayQuantity = struct {
     value: f64,
-    unit: []const u8,
+    dim: Dimension,
+    unit: []const u8, // preferred display unit symbol
+    mode: Format.FormatMode = .none,
+    is_delta: bool = false,
 
-    pub fn format(self: AnyQuantity, writer: *std.Io.Writer) !void {
+    pub fn format(self: DisplayQuantity, writer: *std.Io.Writer) !void {
         const u = findUnitAllDynamic(self.unit, null) orelse {
             return writer.print("{d} [{any}]", .{ self.value, self.dim });
         };

@@ -74,7 +74,7 @@ pub fn formatQuantity(
 /// Format a quantity using a specific display unit (not a registry).
 pub fn formatQuantityAsUnit(
     writer: *std.Io.Writer,
-    q: anytype, // Quantity(Dim) or AnyQuantity
+    q: anytype, // Quantity(Dim) or DisplayQuantity
     display_unit: Unit,
     mode: FormatMode,
 ) !void {

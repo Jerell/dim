@@ -179,5 +179,30 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 });
 
 fn identifierType(text: []const u8) TokenType {
-    return keywords.get(text) orelse TokenType.IDENTIFIER;
+    return keywords.get(text) orelse TokenType.Identifier;
+}
+
+fn parseConversion(self: *Parser) !*Expr {
+    var expr = try self.parseExpression();
+
+    if (self.match(.IN)) {
+        const unit_tok = try self.consume(.IDENTIFIER, "Expected unit after 'in'");
+        var mode: ?Format.FormatMode = null;
+
+        if (self.match(.COLON)) {
+            const mode_tok = try self.consume(.IDENTIFIER, "Expected format mode after ':'");
+            if (std.mem.eql(u8, mode_tok.lexeme, "scientific")) mode = .scientific
+            else if (std.mem.eql(u8, mode_tok.lexeme, "engineering")) mode = .engineering
+            else if (std.mem.eql(u8, mode_tok.lexeme, "auto")) mode = .auto
+            else mode = .none;
+        }
+
+        expr = self.allocExpr(.display, Display{
+            .expr = expr,
+            .target_unit = unit_tok.lexeme,
+            .mode = mode,
+        });
+    }
+
+    return expr;
 }

@@ -2,6 +2,7 @@ const std = @import("std");
 const TokenType = @import("tokentype.zig").TokenType;
 const Token = @import("token.zig").Token;
 const dim = @import("dim");
+const Format = @import("../format.zig");
 
 pub const RuntimeError = error{
     InvalidOperands,
@@ -16,7 +17,8 @@ pub const LiteralValue = union(enum) {
     number: f64,
     string: []const u8,
     boolean: bool,
-    quantity: dim.AnyQuantity,
+    quantity: dim.Quantity,
+    display_quantity: dim.DisplayQuantity,
     nil,
 };
 
@@ -28,8 +30,9 @@ pub const Literal = struct {
             .number => |n| try writer.print("{}", .{n}),
             .string => |s| try writer.print("\"{s}\"", .{s}),
             .boolean => |b| try writer.print("{s}", .{b}),
-            .quantity => |q| try writer.print("{}", .{q}),
-            ???.nil => try writer.print("nil", .{}),
+            .quantity => |q| try q.format(writer),
+            .display_quantity => |dq| try dq.format(writer),
+            .nil => try writer.print("nil", .{}),
         }
     }
 
@@ -201,28 +204,48 @@ pub const Unit = struct {
     }
 };
 
-pub const Conversion = struct {
+pub const Display = struct {
     expr: *Expr,
     target_unit: []const u8,
+    mode: ?Format.FormatMode = null, // optional
 
-    pub fn print(self: Conversion, writer: *std.Io.Writer) !void {
-        try writer.print("(convert ", .{});
+    pub fn print(self: Display, writer: *std.Io.Writer) !void {
+        try writer.print("(display ", .{});
         try self.expr.print(writer);
-        try writer.print(" in {s})", .{self.target_unit});
+        try writer.print(" in {s}", .{self.target_unit});
+        if (self.mode) |m| {
+            try writer.print(":{s}", .{@tagName(m)});
+        }
+        try writer.print(")", .{});
     }
 
     pub fn evaluate(
-        self: *Conversion,
+        self: *Display,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
         const val = try self.expr.evaluate(allocator);
         if (val != .quantity) return RuntimeError.InvalidOperand;
 
+        const q = val.quantity;
+
+        // Ensure target unit exists
         const u = dim.findUnitAllDynamic(self.target_unit, null) orelse {
             return RuntimeError.UndefinedVariable;
         };
 
-        return LiteralValue{ .quantity = u.to(val) };
+        // Ensure dimensions match
+        if (!dim.Dimension.eql(q.dim, u.dim)) {
+            return RuntimeError.InvalidOperands;
+        }
+
+        // Keep canonical value, but override display unit + mode
+        return LiteralValue{ .quantity = dim.DisplayQuantity{
+            .value = q.value,
+            .dim = q.dim,
+            .unit = self.target_unit,
+            .mode = self.mode orelse .none,
+            .is_delta = q.is_delta,
+        } };
     }
 };
 
@@ -232,7 +255,7 @@ pub const Expr = union(enum) {
     literal: Literal,
     grouping: Grouping,
     unit: Unit,
-    conversion: Conversion,
+    display: Display,
 
     pub fn evaluate(
         self: *Expr,
@@ -244,7 +267,7 @@ pub const Expr = union(enum) {
             .literal => |*literal| return literal.evaluate(allocator),
             .grouping => |*grouping| return grouping.evaluate(allocator),
             .unit => |*unit| return unit.evaluate(allocator),
-            .conversion => |*conv| return conv.evaluate(allocator),
+            .display => |*display| return display.evaluate(allocator),
         }
     }
 
@@ -255,7 +278,7 @@ pub const Expr = union(enum) {
             .literal => |literal| return literal.print(writer),
             .grouping => |grouping| return grouping.print(writer),
             .unit => |unit| return unit.print(writer),
-            .conversion => |conv| return conv.print(writer),
+            .display => |display| return display.print(writer),
         }
     }
 };

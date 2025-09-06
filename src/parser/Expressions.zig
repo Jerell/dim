@@ -1,6 +1,7 @@
 const std = @import("std");
 const TokenType = @import("tokentype.zig").TokenType;
 const Token = @import("token.zig").Token;
+const dim = @import("dim");
 
 pub const RuntimeError = error{
     InvalidOperands,
@@ -15,6 +16,7 @@ pub const LiteralValue = union(enum) {
     number: f64,
     string: []const u8,
     boolean: bool,
+    quantity: dim.AnyQuantity,
     nil,
 };
 
@@ -25,8 +27,9 @@ pub const Literal = struct {
         switch (self.value) {
             .number => |n| try writer.print("{}", .{n}),
             .string => |s| try writer.print("\"{s}\"", .{s}),
-            .boolean => |b| try writer.print("{}", .{b}),
-            .nil => try writer.print("nil", .{}),
+            .boolean => |b| try writer.print("{s}", .{b}),
+            .quantity => |q| try writer.print("{}", .{q}),
+            ???.nil => try writer.print("nil", .{}),
         }
     }
 
@@ -188,10 +191,13 @@ pub const Unit = struct {
         const val = try self.value.evaluate(allocator);
         if (val != .number) return RuntimeError.InvalidOperand;
 
-        // TODO: hook into your dim library here
-        // e.g. look up unit_name in registry and wrap into a Quantity
-        // For now, just return a string for debugging
-        return LiteralValue{ .string = self.unit_name };
+        const num = val.number;
+
+        const u = dim.findUnitAllDynamic(self.unit_name, null) orelse {
+            return RuntimeError.UndefinedVariable;
+        };
+
+        return LiteralValue{ .quantity = u.from(num) };
     }
 };
 
@@ -210,13 +216,13 @@ pub const Conversion = struct {
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
         const val = try self.expr.evaluate(allocator);
-        _ = val;
+        if (val != .quantity) return RuntimeError.InvalidOperand;
 
-        // TODO: integrate with dim library
-        // - Ensure val is a Quantity
-        // - Convert to target_unit
-        // For now, just return a string for debugging
-        return LiteralValue{ .string = self.target_unit };
+        const u = dim.findUnitAllDynamic(self.target_unit, null) orelse {
+            return RuntimeError.UndefinedVariable;
+        };
+
+        return LiteralValue{ .quantity = u.to(val) };
     }
 };
 

@@ -1,6 +1,7 @@
 const std = @import("std");
 const Dimension = @import("Dimension.zig").Dimension;
 const UnitRegistry = @import("Unit.zig").UnitRegistry;
+const Unit = @import("Unit.zig").Unit;
 const Format = @import("Format.zig");
 
 const QuantityError = error{
@@ -62,6 +63,20 @@ pub fn Quantity(comptime Dim: Dimension) type {
                     self.reg,
                     self.mode,
                 );
+            }
+        };
+
+        pub fn AsUnit(self: Quantity(Dim), u: Unit, mode: Format.FormatMode) FormatUnitWrapper {
+            return .{ .q = self, .u = u, .mode = mode };
+        }
+
+        pub const FormatUnitWrapper = struct {
+            q: Quantity(Dim),
+            u: Unit,
+            mode: Format.FormatMode,
+
+            pub fn format(self: @This(), writer: anytype) !void {
+                try Format.formatQuantityAsUnit(writer, self.q, self.u, self.mode);
             }
         };
 

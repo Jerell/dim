@@ -64,11 +64,11 @@ $ dim 5 m / 2 s in km/h
 
 - [ ] Tokenizer for numbers, units, operators, `in`.
 - [ ] Parser for arithmetic expressions + optional `in <unit>`.
-- [ ] AST nodes:
-  - [ ] `Literal`
-  - [ ] `UnitExpr` (e.g. `10 celsius`)
-  - [ ] `BinaryExpr` (`+`, `-`, `*`, `/`)
-  - [ ] `ConversionExpr` (`in kelvin`)
+- [x] AST nodes:
+  - [x] `Literal`
+  - [x] `UnitExpr` (e.g. `10 celsius`)
+  - [x] `BinaryExpr` (`+`, `-`, `*`, `/`)
+  - [x] `ConversionExpr` (`in kelvin`)
 - [ ] Evaluator that maps AST → `Quantity` operations.
 - [ ] Default output in canonical SI units.
 - [ ] Implement `in <unit>` conversion.

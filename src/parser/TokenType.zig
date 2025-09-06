@@ -14,7 +14,6 @@ pub const TokenType = enum {
     Caret,
     LParen,
     RParen,
-
     // for unit conversion
     In,
 

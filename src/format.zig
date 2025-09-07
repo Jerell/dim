@@ -161,12 +161,6 @@ pub fn normalizeUnitString(
     }
 
     // Try picking one non-base derived unit that reduces complexity (N, J, W, Pa, m/s, m/s², etc.)
-    const is_base_unit = struct {
-        fn check(sym: []const u8) bool {
-            return std.mem.eql(u8, sym, "m") or std.mem.eql(u8, sym, "kg") or std.mem.eql(u8, sym, "s") or std.mem.eql(u8, sym, "A") or std.mem.eql(u8, sym, "K") or std.mem.eql(u8, sym, "mol") or std.mem.eql(u8, sym, "cd");
-        }
-    };
-
     const absI32 = struct {
         fn call(x: i32) i32 {
             return if (x >= 0) x else -x;
@@ -180,16 +174,51 @@ pub fn normalizeUnitString(
 
     var picked: ?[]const u8 = null;
     var best_reduction: i32 = 0;
+    var best_priority: i32 = 1000;
+    const preferred_symbols = [_][]const u8{ "N", "J", "W", "Pa", "m/s²", "m/s", "m²", "m³" };
+    const getPriority = struct {
+        fn call(sym: []const u8) i32 {
+            var i: usize = 0;
+            while (i < preferred_symbols.len) : (i += 1) {
+                if (std.mem.eql(u8, sym, preferred_symbols[i])) return @as(i32, @intCast(i));
+            }
+            return 999;
+        }
+    }.call;
+
     const curr_c = complexitySum(rem);
     for (reg.units) |u| {
-        if (is_base_unit.check(u.symbol)) continue;
         if (u.scale != 1.0) continue; // avoid picking cm, km, etc.
-        const d_after = Dimension.sub(rem, u.dim);
+        // Skip pure base units (basis vectors)
+        const d = u.dim;
+        const is_base = (d.L == 1 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
+            (d.L == 0 and d.M == 1 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
+            (d.L == 0 and d.M == 0 and d.T == 1 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
+            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 1 and d.Th == 0 and d.N == 0 and d.J == 0) or
+            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 1 and d.N == 0 and d.J == 0) or
+            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 1 and d.J == 0) or
+            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 1);
+        if (is_base) continue;
+
+        const d_after = Dimension.sub(rem, d);
         const reduction = curr_c - complexitySum(d_after);
-        if (reduction > best_reduction) {
+        if (reduction <= 0) continue;
+
+        const pr = getPriority(u.symbol);
+        if (pr < best_priority or (pr == best_priority and reduction > best_reduction)) {
+            best_priority = pr;
             best_reduction = reduction;
             picked = u.symbol;
-            rem = d_after;
+        }
+    }
+
+    // If we picked a derived unit, subtract its dimension from the remainder now
+    if (picked) |sym_pick| {
+        for (reg.units) |u| {
+            if (u.scale == 1.0 and std.mem.eql(u8, u.symbol, sym_pick)) {
+                rem = Dimension.sub(rem, u.dim);
+                break;
+            }
         }
     }
 

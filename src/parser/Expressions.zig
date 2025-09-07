@@ -159,7 +159,7 @@ pub const Binary = struct {
                 }
                 return RuntimeError.InvalidOperands;
             },
-            .EqualEqual => return .{ .boolean = isEqual(left, right) },
+            .EqualEqual, .Equal => return .{ .boolean = isEqual(left, right) },
             .BangEqual => return .{ .boolean = !isEqual(left, right) },
             .Greater, .GreaterEqual, .Less, .LessEqual => {
                 // Comparisons: allow for numbers; for quantities require same dimension and compare canonical values

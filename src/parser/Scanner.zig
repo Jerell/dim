@@ -47,6 +47,7 @@ pub const Scanner = struct {
             ')' => try self.addToken(TokenType.RParen, null),
             ',' => try self.addToken(TokenType.Comma, null),
             '.' => try self.addToken(TokenType.Dot, null),
+            ':' => try self.addToken(TokenType.Colon, null),
             '-' => try self.addToken(TokenType.Minus, null),
             '+' => try self.addToken(TokenType.Plus, null),
             '*' => try self.addToken(TokenType.Star, null),

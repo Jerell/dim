@@ -81,6 +81,7 @@ pub const Parser = struct {
             TokenType.GreaterEqual,
             TokenType.Less,
             TokenType.LessEqual,
+            TokenType.Equal,
             TokenType.EqualEqual,
             TokenType.BangEqual,
         })) {
@@ -216,7 +217,23 @@ pub const Parser = struct {
     fn parseUnitExpr(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.parseUnitTerm();
 
-        while (self.match(&.{ TokenType.Star, TokenType.Slash })) {
+        // Only consume '*' or '/' as part of a unit expression if they are
+        // followed by another unit identifier. This avoids greedily swallowing
+        // numeric multiplication/division like "2 m * 3 m" or "1 m / 2 s".
+        while (true) {
+            const is_mul = self.check(TokenType.Star);
+            const is_div = self.check(TokenType.Slash);
+            if (!(is_mul or is_div)) break;
+
+            // Look ahead one token after the operator; if it's not an Identifier,
+            // stop parsing the unit expression here and let higher-precedence
+            // arithmetic handle the operator.
+            const after_op_index = self.current + 1;
+            if (after_op_index >= self.tokens.len) break;
+            if (self.tokens[after_op_index].type != TokenType.Identifier) break;
+
+            // Consume operator now that we know another unit term follows
+            _ = self.advance();
             const op = self.previous();
             const right = try self.parseUnitTerm();
 

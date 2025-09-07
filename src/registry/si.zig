@@ -5,6 +5,9 @@ pub const km = dim.Unit{ .dim = dim.DIM.Length, .scale = 1000.0, .symbol = "km" 
 pub const cm = dim.Unit{ .dim = dim.DIM.Length, .scale = 0.01, .symbol = "cm" };
 pub const mm = dim.Unit{ .dim = dim.DIM.Length, .scale = 0.001, .symbol = "mm" };
 
+pub const m2 = dim.Unit{ .dim = dim.DIM.Area, .scale = 1.0, .symbol = "m²" };
+pub const m3 = dim.Unit{ .dim = dim.DIM.Volume, .scale = 1.0, .symbol = "m³" };
+
 pub const g = dim.Unit{ .dim = dim.DIM.Mass, .scale = 0.001, .symbol = "g" };
 pub const kg = dim.Unit{ .dim = dim.DIM.Mass, .scale = 1.0, .symbol = "kg" };
 
@@ -36,7 +39,7 @@ pub const Units = [_]dim.Unit{
     h,    A,  K,  C,
     mol,  cd, Pa, bar,
     J,    W,  N,  mps,
-    mps2,
+    mps2, m2, m3,
 };
 
 const aliases = [_]dim.Alias{

@@ -47,7 +47,8 @@ pub const Parser = struct {
         var expr_ptr = try self.expression();
 
         if (self.match(&.{TokenType.As})) {
-            const unit_tok = try self.consume(TokenType.Identifier, "Expected unit after 'as'");
+            // Parse a full unit expression after 'as' that may include *, /, ^
+            const unit_expr = try self.parseUnitExpr();
             var mode: ?FormatMode = null;
 
             if (self.match(&.{TokenType.Colon})) {
@@ -59,7 +60,7 @@ pub const Parser = struct {
             node_ptr.* = ast_expr.Expr{
                 .display = ast_expr.Display{
                     .expr = expr_ptr,
-                    .target_unit = unit_tok.lexeme,
+                    .unit_expr = unit_expr,
                     .mode = mode,
                 },
             };
@@ -223,7 +224,8 @@ pub const Parser = struct {
         while (true) {
             const is_mul = self.check(TokenType.Star);
             const is_div = self.check(TokenType.Slash);
-            if (!(is_mul or is_div)) break;
+            const is_pow = self.check(TokenType.Caret);
+            if (!(is_mul or is_div or is_pow)) break;
 
             // Look ahead one token after the operator; if it's not an Identifier,
             // stop parsing the unit expression here and let higher-precedence

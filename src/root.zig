@@ -15,6 +15,7 @@ pub const subDisplay = @import("runtime.zig").subDisplay;
 pub const mulDisplay = @import("runtime.zig").mulDisplay;
 pub const divDisplay = @import("runtime.zig").divDisplay;
 pub const scaleDisplay = @import("runtime.zig").scaleDisplay;
+pub const powDisplay = @import("runtime.zig").powDisplay;
 
 // Re-export formatting API
 pub const Format = @import("format.zig");

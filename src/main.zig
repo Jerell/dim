@@ -139,8 +139,9 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
                 try dim.Format.formatQuantityAsUnit(io.writer(), dq, u, dq.mode);
                 try io.writeAll("\n");
             } else {
-                // Fallback: raw value and unit
-                try io.printf("{d:.3} {s}\n", .{ dq.value, dq.unit });
+                // Fallback: use DisplayQuantity.format to respect mode
+                try dq.format(io.writer());
+                try io.writeAll("\n");
             }
         },
         .nil => try io.writeAll("nil\n"),

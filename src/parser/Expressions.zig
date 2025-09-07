@@ -172,6 +172,25 @@ pub const Binary = struct {
                 }
                 return RuntimeError.InvalidOperands;
             },
+            .Caret => {
+                // Right must be a number; base can be number or display_quantity
+                if (right != .number) return RuntimeError.InvalidOperands;
+                const exp = right.number;
+                // Only allow integer exponents for quantities (dimension math)
+                const exp_int: i32 = @intFromFloat(exp);
+                if (@as(f64, @floatFromInt(exp_int)) != exp) {
+                    if (left == .display_quantity) return RuntimeError.InvalidOperands;
+                }
+
+                if (left == .number) {
+                    return .{ .number = std.math.pow(f64, left.number, exp) };
+                }
+                if (left == .display_quantity) {
+                    const dq = try rt.powDisplay(allocator, left.display_quantity, exp_int);
+                    return .{ .display_quantity = dq };
+                }
+                return RuntimeError.InvalidOperands;
+            },
             .EqualEqual, .Equal => return .{ .boolean = isEqual(left, right) },
             .BangEqual => return .{ .boolean = !isEqual(left, right) },
             .Greater, .GreaterEqual, .Less, .LessEqual => {
@@ -232,15 +251,11 @@ pub const Unit = struct {
         if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
         const unit_dq = unit_val.display_quantity;
 
-        // Resolve the unit and convert numeric value to canonical
-        const u = findUnitAllDynamic(unit_dq.unit, null) orelse {
-            return RuntimeError.UndefinedVariable;
-        };
-
+        // Multiply by unit conversion factor to get canonical value
         const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{unit_dq.unit});
         return LiteralValue{ .display_quantity = DisplayQuantity{
-            .value = u.toCanonical(num),
-            .dim = u.dim,
+            .value = num * unit_dq.value,
+            .dim = unit_dq.dim,
             .unit = unit_copy,
             .mode = .none,
             .is_delta = false,
@@ -250,13 +265,14 @@ pub const Unit = struct {
 
 pub const Display = struct {
     expr: *Expr,
-    target_unit: []const u8,
+    unit_expr: *Expr, // unit expression after 'as' (supports *, /, ^)
     mode: ?Format.FormatMode = null, // optional
 
     pub fn print(self: Display, writer: *std.Io.Writer) !void {
         try writer.print("(display ", .{});
         try self.expr.print(writer);
-        try writer.print(" in {s}", .{self.target_unit});
+        try writer.print(" as ", .{});
+        try self.unit_expr.print(writer);
         if (self.mode) |m| {
             try writer.print(":{s}", .{@tagName(m)});
         }
@@ -272,19 +288,20 @@ pub const Display = struct {
 
         const dq = val.display_quantity;
 
-        // Ensure target unit exists
-        const u = findUnitAllDynamic(self.target_unit, null) orelse {
-            return RuntimeError.UndefinedVariable;
-        };
+        // Evaluate the unit expression to a DisplayQuantity representing the target unit
+        const unit_val = try self.unit_expr.evaluate(allocator);
+        if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
+        const target = unit_val.display_quantity;
 
         // Ensure dimensions match
-        if (!Dimension.eql(dq.dim, u.dim)) {
+        if (!Dimension.eql(dq.dim, target.dim)) {
             return RuntimeError.InvalidOperands;
         }
 
-        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{self.target_unit});
+        // Convert canonical value to requested unit by dividing by target factor
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{target.unit});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
-            .value = dq.value,
+            .value = dq.value / target.value,
             .dim = dq.dim,
             .unit = unit_copy,
             .mode = self.mode orelse .none,
@@ -309,7 +326,6 @@ pub const UnitExpr = struct {
         self: *UnitExpr,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-
         // Look up the unit definition
         const u = findUnitAllDynamic(self.name, null) orelse {
             return RuntimeError.UndefinedVariable;
@@ -321,15 +337,23 @@ pub const UnitExpr = struct {
             dim_accum = Dimension.pow(u.dim, self.exponent);
         }
 
-        // Return a DisplayQuantity with value=1.0 (pure unit factor)
-        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{self.name});
-        return LiteralValue{ .display_quantity = rt.DisplayQuantity{
-            .value = 1.0,
-            .dim = dim_accum,
-            .unit = unit_copy,
-            .mode = .none,
-            .is_delta = false,
-        } };
+        // Compute conversion factor to canonical for this unit (raised to exponent)
+        const base_factor = u.toCanonical(1.0);
+        const factor = if (self.exponent == 1)
+            base_factor
+        else
+            std.math.pow(f64, base_factor, @as(f64, @floatFromInt(self.exponent)));
+
+        return LiteralValue{
+            .display_quantity = rt.DisplayQuantity{
+                .value = factor,
+                .dim = dim_accum,
+                // Preserve user-specified unit expression (e.g., "in^2")
+                .unit = try self.toString(allocator),
+                .mode = .none,
+                .is_delta = false,
+            },
+        };
     }
 
     pub fn toString(self: UnitExpr, allocator: std.mem.Allocator) ![]u8 {

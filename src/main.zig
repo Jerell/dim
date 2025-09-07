@@ -6,7 +6,6 @@ const Parser = @import("parser/Parser.zig").Parser;
 
 pub fn main() !void {
     var io = Io.init();
-    io.setup();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);

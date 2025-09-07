@@ -14,14 +14,11 @@ pub const Io = struct {
     in_fr: std.fs.File.Reader,
 
     pub fn init() Io {
-        const self: Io = undefined;
-        return self;
-    }
-
-    pub fn setup(self: *Io) void {
+        var self: Io = undefined;
         self.out_fw = std.fs.File.stdout().writer(&self.out_buf);
         self.err_fw = std.fs.File.stderr().writer(&self.err_buf);
         self.in_fr = std.fs.File.stdin().reader(&self.in_buf);
+        return self;
     }
 
     // stdout helpers

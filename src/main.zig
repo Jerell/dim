@@ -31,7 +31,12 @@ fn runFile(io: *Io, allocator: std.mem.Allocator, path: []const u8) !void {
     const bytes = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
     defer allocator.free(bytes);
 
-    try run(io, allocator, bytes);
+    var it = std.mem.tokenizeAny(u8, bytes, "\r\n");
+    while (it.next()) |line| {
+        const trimmed = std.mem.trim(u8, line, " \t\r");
+        if (trimmed.len == 0) continue;
+        try run(io, allocator, trimmed);
+    }
 }
 
 fn runPrompt(io: *Io, allocator: std.mem.Allocator) !void {

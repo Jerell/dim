@@ -62,18 +62,16 @@ $ dim 5 m / 2 s in km/h
 
 ### CLI
 
-- [ ] Tokenizer for numbers, units, operators, `in`.
-- [ ] Parser for arithmetic expressions + optional `in <unit>`.
+- [x] Tokenizer for numbers, units, operators, `in`.
+- [x] Parser for arithmetic expressions.
 - [x] AST nodes:
   - [x] `Literal`
   - [x] `UnitExpr` (e.g. `10 celsius`)
   - [x] `BinaryExpr` (`+`, `-`, `*`, `/`)
   - [x] `ConversionExpr` (`in kelvin`)
-- [ ] Evaluator that maps AST → `Quantity` operations.
-- [ ] Default output in canonical SI units.
-- [ ] Implement `in <unit>` conversion.
-- [ ] Add REPL mode (`dim>` prompt).
-- [ ] Add CLI flags for formatting (`--scientific`, `--engineering`).
+- [x] Evaluator that maps AST → `Quantity` operations.
+- [x] Implement `in <unit>` conversion.
+- [x] Add REPL mode (`>` prompt).
 
 ---
 

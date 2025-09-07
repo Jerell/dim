@@ -175,7 +175,7 @@ pub fn normalizeUnitString(
     var picked: ?[]const u8 = null;
     var best_reduction: i32 = 0;
     var best_priority: i32 = 1000;
-    const preferred_symbols = [_][]const u8{ "N", "J", "W", "Pa", "m/s²", "m/s", "m²", "m³" };
+    const preferred_symbols = [_][]const u8{ "J", "N", "W", "Pa", "m/s²", "m/s", "m²", "m³" };
     const getPriority = struct {
         fn call(sym: []const u8) i32 {
             var i: usize = 0;

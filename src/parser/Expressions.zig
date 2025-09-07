@@ -142,7 +142,7 @@ pub const Binary = struct {
             .Star => {
                 if (both_numbers) return .{ .number = left.number * right.number };
                 if (both_quant) {
-                    const dq = rt.mulDisplay(left.display_quantity, right.display_quantity);
+                    const dq = try rt.mulDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -154,7 +154,7 @@ pub const Binary = struct {
                 }
                 if (both_quant) {
                     if (right.display_quantity.value == 0) return RuntimeError.DivisionByZero;
-                    const dq = rt.divDisplay(left.display_quantity, right.display_quantity);
+                    const dq = try rt.divDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;

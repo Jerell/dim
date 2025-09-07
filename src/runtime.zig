@@ -1,6 +1,7 @@
 const std = @import("std");
 const Dimension = @import("Dimension.zig").Dimension;
 const Format = @import("format.zig");
+const SiRegistry = @import("registry/Si.zig").Registry;
 
 pub const DisplayQuantity = struct {
     value: f64, // canonical
@@ -41,26 +42,44 @@ pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}
     };
 }
 
-pub fn mulDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
+pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     const new_dim = Dimension.add(a.dim, b.dim);
+
+    const fallback = try std.fmt.allocPrint(allocator, "{s}*{s}", .{ a.unit, b.unit });
+    defer allocator.free(fallback);
+    const normalized_unit = try Format.normalizeUnitString(
+        allocator,
+        new_dim,
+        fallback,
+        SiRegistry,
+    );
+
     return DisplayQuantity{
         .value = a.value * b.value,
         .dim = new_dim,
-        .unit = a.unit, // preserve left's unit symbol for display
+        .unit = normalized_unit,
         .mode = .none,
         .is_delta = false,
     };
 }
 
-pub fn divDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
+pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     const new_dim = Dimension.sub(a.dim, b.dim);
+
+    const fallback = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ a.unit, b.unit });
+    defer allocator.free(fallback);
+    const normalized_unit = try Format.normalizeUnitString(
+        allocator,
+        new_dim,
+        fallback,
+        SiRegistry,
+    );
+
     return DisplayQuantity{
         .value = a.value / b.value,
         .dim = new_dim,
-        .unit = a.unit,
+        .unit = normalized_unit,
         .mode = .none,
         .is_delta = false,
     };
 }
-
-

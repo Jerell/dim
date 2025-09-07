@@ -107,13 +107,177 @@ pub fn normalizeUnitString(
     fallback: []const u8,
     reg: UnitRegistry,
 ) ![]u8 {
-    // Check aliases first
+    // 1) Prefer aliases that match the full dimension
     for (reg.aliases) |alias| {
         if (Dimension.eql(alias.target.dim, dim)) {
             return try std.fmt.allocPrint(allocator, "{s}", .{alias.symbol});
         }
     }
 
-    // No alias found → return fallback string
-    return try std.fmt.allocPrint(allocator, "{s}", .{fallback});
+    // 2) Prefer a registry unit that matches the full dimension (e.g., m/s, m/s², N)
+    //    and is canonical (scale == 1.0) to avoid picking prefixed units like cm/km here.
+    for (reg.units) |u| {
+        if (Dimension.eql(u.dim, dim) and u.scale == 1.0) {
+            return try std.fmt.allocPrint(allocator, "{s}", .{u.symbol});
+        }
+    }
+
+    // 3) Build a canonical SI expression from the dimension, with a simple greedy
+    //    factoring of one derived unit (if it reduces complexity), then base units.
+    var rem = dim;
+
+    // Try picking one non-base derived unit that reduces complexity (N, J, W, Pa, m/s, m/s², etc.)
+    const is_base_unit = struct {
+        fn check(sym: []const u8) bool {
+            return std.mem.eql(u8, sym, "m") or std.mem.eql(u8, sym, "kg") or std.mem.eql(u8, sym, "s") or std.mem.eql(u8, sym, "A") or std.mem.eql(u8, sym, "K") or std.mem.eql(u8, sym, "mol") or std.mem.eql(u8, sym, "cd");
+        }
+    };
+
+    const absI32 = struct {
+        fn call(x: i32) i32 {
+            return if (x >= 0) x else -x;
+        }
+    }.call;
+    const complexitySum = struct {
+        fn call(d: Dimension) i32 {
+            return absI32(d.L) + absI32(d.M) + absI32(d.T) + absI32(d.I) + absI32(d.Th) + absI32(d.N) + absI32(d.J);
+        }
+    }.call;
+
+    var picked: ?[]const u8 = null;
+    var best_reduction: i32 = 0;
+    const curr_c = complexitySum(rem);
+    for (reg.units) |u| {
+        if (is_base_unit.check(u.symbol)) continue;
+        if (u.scale != 1.0) continue; // avoid picking cm, km, etc.
+        const d_after = Dimension.sub(rem, u.dim);
+        const reduction = curr_c - complexitySum(d_after);
+        if (reduction > best_reduction) {
+            best_reduction = reduction;
+            picked = u.symbol;
+            rem = d_after;
+        }
+    }
+
+    // Compose result
+    var buf = std.ArrayListUnmanaged(u8){};
+    defer buf.deinit(allocator);
+    var w = buf.writer(allocator);
+
+    var wrote_any = false;
+    if (picked) |sym| {
+        try w.print("{s}", .{sym});
+        wrote_any = true;
+    }
+
+    // Emit numerator base units
+    if (rem.M > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("kg");
+        if (rem.M != 1) try w.print("^{d}", .{rem.M});
+        wrote_any = true;
+    }
+    if (rem.L > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("m");
+        if (rem.L != 1) try w.print("^{d}", .{rem.L});
+        wrote_any = true;
+    }
+    if (rem.T > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("s");
+        if (rem.T != 1) try w.print("^{d}", .{rem.T});
+        wrote_any = true;
+    }
+    if (rem.I > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("A");
+        if (rem.I != 1) try w.print("^{d}", .{rem.I});
+        wrote_any = true;
+    }
+    if (rem.Th > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("K");
+        if (rem.Th != 1) try w.print("^{d}", .{rem.Th});
+        wrote_any = true;
+    }
+    if (rem.N > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("mol");
+        if (rem.N != 1) try w.print("^{d}", .{rem.N});
+        wrote_any = true;
+    }
+    if (rem.J > 0) {
+        if (wrote_any) try w.writeAll("*");
+        try w.writeAll("cd");
+        if (rem.J != 1) try w.print("^{d}", .{rem.J});
+        wrote_any = true;
+    }
+
+    // Emit denominator base units
+    const has_den = (rem.M < 0) or (rem.L < 0) or (rem.T < 0) or (rem.I < 0) or (rem.Th < 0) or (rem.N < 0) or (rem.J < 0);
+    if (has_den) {
+        if (!wrote_any) {
+            try w.writeAll("1");
+            wrote_any = true;
+        }
+        try w.writeAll("/");
+        var need_sep = false;
+        if (rem.M < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("kg");
+            const p = -rem.M;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.L < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("m");
+            const p = -rem.L;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.T < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("s");
+            const p = -rem.T;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.I < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("A");
+            const p = -rem.I;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.Th < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("K");
+            const p = -rem.Th;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.N < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("mol");
+            const p = -rem.N;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+        if (rem.J < 0) {
+            if (need_sep) try w.writeAll("*");
+            try w.writeAll("cd");
+            const p = -rem.J;
+            if (p != 1) try w.print("^{d}", .{p});
+            need_sep = true;
+        }
+    }
+
+    if (!wrote_any) {
+        // Dimensionless
+        return try std.fmt.allocPrint(allocator, "{s}", .{fallback});
+    }
+
+    return buf.toOwnedSlice(allocator);
 }

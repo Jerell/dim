@@ -46,8 +46,8 @@ pub const Parser = struct {
     fn conversion(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.expression();
 
-        if (self.match(&.{TokenType.In})) {
-            const unit_tok = try self.consume(TokenType.Identifier, "Expected unit after 'in'");
+        if (self.match(&.{TokenType.As})) {
+            const unit_tok = try self.consume(TokenType.Identifier, "Expected unit after 'as'");
             var mode: ?FormatMode = null;
 
             if (self.match(&.{TokenType.Colon})) {

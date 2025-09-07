@@ -5,16 +5,16 @@
 It provides **compile-time dimensional safety** (you can’t add a pressure to a temperature), **unit conversions**, and **pretty-printing with SI prefixes and aliases**. The CLI lets you do quick calculations like:
 
 ```bash
-$ dim "10 C + 20 F in K"
+$ dim "10 C + 20 F as K"
 436.135 K
 
-$ dim "10 C + 20 F in C"
+$ dim "10 C + 20 F as C"
 162.985 °C
 
-$ dim "1 bar in Pa:scientific"
+$ dim "1 bar as Pa:scientific"
 1.000e5 Pa
 
-$ dim "1 bar in kPa"
+$ dim "1 bar as kPa"
 100.000 kPa
 
 ```

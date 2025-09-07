@@ -14,7 +14,7 @@ pub const TokenType = enum {
     LParen,
     RParen,
     // for unit conversion
-    In,
+    As,
     Colon,
 
     // comparison

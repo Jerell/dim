@@ -186,7 +186,7 @@ fn isAlphaNumeric(char: u8) bool {
 const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "and", TokenType.And },
     .{ "or", TokenType.Or },
-    .{ "in", TokenType.In },
+    .{ "as", TokenType.As },
 });
 
 fn identifierType(text: []const u8) TokenType {

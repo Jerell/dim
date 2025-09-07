@@ -17,7 +17,7 @@ $ dim 5 m / 2 s in km/h
 
 ---
 
-## ✨ Features (planned)
+## ✨ Features
 
 - **Library (`dim`)**
 

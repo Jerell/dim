@@ -47,38 +47,6 @@ $ dim "1 bar in kPa"
 
 ---
 
-## 📚 Roadmap
-
-### Library
-
-- [x] Define base dimensions (M, L, T, Θ).
-- [x] Implement `Quantity(Dim, Registry)` generic type.
-- [x] Add unit constructors for common units (Pa, bar, K, °C, m, s).
-- [x] Implement arithmetic (`add`, `sub`, `mul`, `div`) with compile-time dimensional analysis.
-- [x] Implement formatting:
-  - [x] SI prefixes (auto, none, scientific, engineering).
-  - [x] Derived unit aliases (N, J, W, Hz).
-- [x] Implement configurable `UnitRegistry` (aliases + prefixes).
-- [x] Provide built-in registries:
-  - [x] SI (default).
-  - [x] Imperial (psi, °F, miles, …).
-  - [x] CGS (cm, g, dynes, …).
-
-### CLI
-
-- [x] Tokenizer for numbers, units, operators, `in`.
-- [x] Parser for arithmetic expressions.
-- [x] AST nodes:
-  - [x] `Literal`
-  - [x] `UnitExpr` (e.g. `10 celsius`)
-  - [x] `BinaryExpr` (`+`, `-`, `*`, `/`)
-  - [x] `ConversionExpr` (`in kelvin`)
-- [x] Evaluator that maps AST → `Quantity` operations.
-- [x] Implement `in <unit>` conversion.
-- [x] Add REPL mode (`>` prompt).
-
----
-
 ## 🛠️ Example Usage
 
 ### Library

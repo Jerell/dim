@@ -37,6 +37,7 @@ fn runFile(io: *Io, allocator: std.mem.Allocator, path: []const u8) !void {
 fn runPrompt(io: *Io, allocator: std.mem.Allocator) !void {
     while (true) {
         try io.writeAll("> ");
+        try io.flushAll();
         const line = io.readLineAlloc(allocator, 4096) catch |err| {
             if (err == error.EndOfStream) return; // exit on EOF
             return err;
@@ -44,6 +45,7 @@ fn runPrompt(io: *Io, allocator: std.mem.Allocator) !void {
         defer allocator.free(line);
 
         try run(io, allocator, line);
+        try io.flushAll();
     }
 }
 
@@ -73,7 +75,11 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         .number => |n| try io.printf("{d}\n", .{n}),
         .string => |s| try io.printf("{s}\n", .{s}),
         .boolean => |b| try io.printf("{}\n", .{b}),
-        .display_quantity => |dq| try dq.format(io.writer()),
+        .display_quantity => |dq| {
+            try dq.format(io.writer());
+            try io.writeAll("\n");
+        },
         .nil => try io.writeAll("nil\n"),
     }
+    try io.flushAll();
 }

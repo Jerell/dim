@@ -126,8 +126,7 @@ pub const Binary = struct {
             .Plus => {
                 if (both_numbers) return .{ .number = left.number + right.number };
                 if (both_quant) {
-                    const dq = rt.addDisplay(left.display_quantity, right.display_quantity)
-                        catch return RuntimeError.InvalidOperands;
+                    const dq = try rt.addDisplay(left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -135,8 +134,7 @@ pub const Binary = struct {
             .Minus => {
                 if (both_numbers) return .{ .number = left.number - right.number };
                 if (both_quant) {
-                    const dq = rt.subDisplay(left.display_quantity, right.display_quantity)
-                        catch return RuntimeError.InvalidOperands;
+                    const dq = try rt.subDisplay(left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;

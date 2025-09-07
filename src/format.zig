@@ -100,3 +100,20 @@ pub fn formatQuantityAsUnit(
         .auto => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, val, display_unit.symbol }),
     }
 }
+
+pub fn normalizeUnitString(
+    allocator: std.mem.Allocator,
+    dim: Dimension,
+    fallback: []const u8,
+    reg: UnitRegistry,
+) ![]u8 {
+    // Check aliases first
+    for (reg.aliases) |alias| {
+        if (Dimension.eql(alias.target.dim, dim)) {
+            return try std.fmt.allocPrint(allocator, "{s}", .{alias.symbol});
+        }
+    }
+
+    // No alias found → return fallback string
+    return try std.fmt.allocPrint(allocator, "{s}", .{fallback});
+}

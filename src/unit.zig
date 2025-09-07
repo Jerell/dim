@@ -1,6 +1,7 @@
 const std = @import("std");
 const Dimension = @import("Dimension.zig").Dimension;
 const Quantity = @import("Quantity.zig").Quantity;
+const DisplayQuantity = @import("parser/runtime.zig").DisplayQuantity;
 
 pub const Unit = struct {
     dim: Dimension,
@@ -16,8 +17,14 @@ pub const Unit = struct {
         return v / self.scale - self.offset;
     }
 
-    pub fn from(self: Unit, v: f64) Quantity(self.dim) {
-        return Quantity(self.dim){ .value = self.toCanonical(v), .is_delta = false };
+    pub fn from(self: Unit, v: f64) DisplayQuantity {
+        return DisplayQuantity{
+            .value = self.toCanonical(v),
+            .dim = self.dim,
+            .unit = self.symbol, // Use the unit's symbol as display unit
+            .mode = .none,
+            .is_delta = false,
+        };
     }
 
     pub fn to(self: Unit, q: anytype) f64 {

@@ -1,7 +1,11 @@
 const std = @import("std");
 const TokenType = @import("tokentype.zig").TokenType;
-const Token = @import("token.zig").Token;
-const dim = @import("dim");
+const Token = @import("Token.zig").Token;
+const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
+const rt = @import("runtime.zig");
+const findUnitAllDynamic = @import("dim").findUnitAllDynamic;
+const Dimension = @import("dim").Dimension;
+const SiRegistry = @import("dim").Registries.si;
 const Format = @import("../format.zig");
 
 pub const RuntimeError = error{
@@ -17,8 +21,7 @@ pub const LiteralValue = union(enum) {
     number: f64,
     string: []const u8,
     boolean: bool,
-    quantity: dim.Quantity,
-    display_quantity: dim.DisplayQuantity,
+    display_quantity: DisplayQuantity,
     nil,
 };
 
@@ -30,7 +33,6 @@ pub const Literal = struct {
             .number => |n| try writer.print("{}", .{n}),
             .string => |s| try writer.print("\"{s}\"", .{s}),
             .boolean => |b| try writer.print("{s}", .{b}),
-            .quantity => |q| try q.format(writer),
             .display_quantity => |dq| try dq.format(writer),
             .nil => try writer.print("nil", .{}),
         }
@@ -72,24 +74,27 @@ pub const Unary = struct {
         try writer.print(")", .{});
     }
 
-    pub fn evaluate(
-        self: *Unary,
-        allocator: std.mem.Allocator,
-    ) RuntimeError!LiteralValue {
-        const right_val = try self.right.evaluate(allocator);
+    pub fn evaluate(self: *Unary, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
+        const rv = try self.right.evaluate(allocator);
         switch (self.operator.type) {
-            .MINUS => {
-                if (right_val != .number) return RuntimeError.InvalidOperand;
-                return LiteralValue{ .number = -right_val.number };
+            .Minus => {
+                if (rv == .number) return .{ .number = -rv.number };
+                if (rv == .display_quantity) {
+                    var dq = rv.display_quantity;
+                    dq.value = -dq.value;
+                    return .{ .display_quantity = dq };
+                }
+                return RuntimeError.InvalidOperand;
             },
-            .BANG => {
-                // Lox truthiness: false and nil are falsey, everything else is truthy
-                const is_truthy = switch (right_val) {
+            .Bang => {
+                const truthy = switch (rv) {
                     .boolean => |b| b,
                     .nil => false,
-                    else => true,
+                    .number => |n| n != 0,
+                    .string => |s| s.len != 0,
+                    .display_quantity => |q| q.value != 0, // treat non-zero as true
                 };
-                return LiteralValue{ .boolean = !is_truthy };
+                return .{ .boolean = !truthy };
             },
             else => unreachable,
         }
@@ -109,68 +114,79 @@ pub const Binary = struct {
         try writer.print(")", .{});
     }
 
-    pub fn evaluate(
-        self: *Binary,
-        allocator: std.mem.Allocator,
-    ) RuntimeError!LiteralValue {
-        const left_val = try self.left.evaluate(allocator);
-        const right_val = try self.right.evaluate(allocator);
+    pub fn evaluate(self: *Binary, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
+        const left = try self.left.evaluate(allocator);
+        const right = try self.right.evaluate(allocator);
+
+        const both_numbers = (left == .number) and (right == .number);
+        const both_quant = (left == .display_quantity) and (right == .display_quantity);
 
         switch (self.operator.type) {
-            .MINUS => {
-                if (left_val != .number or right_val != .number)
-                    return RuntimeError.InvalidOperands;
-                return LiteralValue{ .number = left_val.number - right_val.number };
-            },
-            .SLASH => {
-                if (left_val != .number or right_val != .number)
-                    return RuntimeError.InvalidOperands;
-                if (right_val.number == 0) return RuntimeError.DivisionByZero;
-                return LiteralValue{ .number = left_val.number / right_val.number };
-            },
-            .STAR => {
-                if (left_val != .number or right_val != .number)
-                    return RuntimeError.InvalidOperands;
-                return LiteralValue{ .number = left_val.number * right_val.number };
-            },
-            .PLUS => {
-                return switch (left_val) {
-                    .number => |ln| switch (right_val) {
-                        .number => |rn| LiteralValue{ .number = ln + rn },
-                        else => RuntimeError.InvalidOperands,
-                    },
-                    .string => |ls| switch (right_val) {
-                        .string => |rs| {
-                            const new_str = try std.fmt.allocPrint(
-                                allocator,
-                                "{s}{s}",
-                                .{ ls, rs },
-                            );
-                            return LiteralValue{ .string = new_str };
-                        },
-                        else => RuntimeError.InvalidOperands,
-                    },
-                    else => RuntimeError.InvalidOperands,
-                };
-            },
-            .GREATER, .GREATER_EQUAL, .LESS, .LESS_EQUAL => {
-                if (left_val != .number or right_val != .number) {
-                    return RuntimeError.InvalidOperands;
+            .Plus => {
+                if (both_numbers) return .{ .number = left.number + right.number };
+                if (both_quant) {
+                    const dq = try rt.addDisplay(left.display_quantity, right.display_quantity);
+                    return .{ .display_quantity = dq };
                 }
-                const comparison_result = switch (self.operator.type) {
-                    .GREATER => left_val.number > right_val.number,
-                    .GREATER_EQUAL => left_val.number >= right_val.number,
-                    .LESS => left_val.number < right_val.number,
-                    .LESS_EQUAL => left_val.number <= right_val.number,
-                    else => unreachable,
-                };
-                return LiteralValue{ .boolean = comparison_result };
+                return RuntimeError.InvalidOperands;
             },
-            .EQUAL_EQUAL => {
-                return LiteralValue{ .boolean = isEqual(left_val, right_val) };
+            .Minus => {
+                if (both_numbers) return .{ .number = left.number - right.number };
+                if (both_quant) {
+                    const dq = try rt.subDisplay(left.display_quantity, right.display_quantity);
+                    return .{ .display_quantity = dq };
+                }
+                return RuntimeError.InvalidOperands;
             },
-            .BANG_EQUAL => {
-                return LiteralValue{ .boolean = !isEqual(left_val, right_val) };
+            .Star => {
+                if (both_numbers) return .{ .number = left.number * right.number };
+                if (both_quant) {
+                    const dq = rt.mulDisplay(left.display_quantity, right.display_quantity);
+                    return .{ .display_quantity = dq };
+                }
+                return RuntimeError.InvalidOperands;
+            },
+            .Slash => {
+                if (both_numbers) {
+                    if (right.number == 0) return RuntimeError.DivisionByZero;
+                    return .{ .number = left.number / right.number };
+                }
+                if (both_quant) {
+                    if (right.display_quantity.value == 0) return RuntimeError.DivisionByZero;
+                    const dq = rt.divDisplay(left.display_quantity, right.display_quantity);
+                    return .{ .display_quantity = dq };
+                }
+                return RuntimeError.InvalidOperands;
+            },
+            .EqualEqual => return .{ .boolean = isEqual(left, right) },
+            .BangEqual => return .{ .boolean = !isEqual(left, right) },
+            .Greater, .GreaterEqual, .Less, .LessEqual => {
+                // Comparisons: allow for numbers; for quantities require same dimension and compare canonical values
+                if (both_numbers) {
+                    const a = left.number;
+                    const b = right.number;
+                    const r = switch (self.operator.type) {
+                        .Greater => a > b,
+                        .GreaterEqual => a >= b,
+                        .Less => a < b,
+                        .LessEqual => a <= b,
+                        else => false,
+                    };
+                    return .{ .boolean = r };
+                }
+                if (both_quant and Dimension.eql(left.display_quantity.dim, right.display_quantity.dim)) {
+                    const a = left.display_quantity.value;
+                    const b = right.display_quantity.value;
+                    const r = switch (self.operator.type) {
+                        .Greater => a > b,
+                        .GreaterEqual => a >= b,
+                        .Less => a < b,
+                        .LessEqual => a <= b,
+                        else => false,
+                    };
+                    return .{ .boolean = r };
+                }
+                return RuntimeError.InvalidOperands;
             },
             else => unreachable,
         }
@@ -179,12 +195,14 @@ pub const Binary = struct {
 
 pub const Unit = struct {
     value: *Expr, // the numeric expression (usually a Literal)
-    unit_name: []const u8, // e.g. "celsius", "bar"
+    unit_expr: *Expr, // the unit expression (e.g., UnitExpr or CompoundUnit)
 
     pub fn print(self: Unit, writer: *std.Io.Writer) !void {
         try writer.print("(unit ", .{});
         try self.value.print(writer);
-        try writer.print(" {s})", .{self.unit_name});
+        try writer.print(" ", .{});
+        try self.unit_expr.print(writer);
+        try writer.print(")", .{});
     }
 
     pub fn evaluate(
@@ -196,11 +214,17 @@ pub const Unit = struct {
 
         const num = val.number;
 
-        const u = dim.findUnitAllDynamic(self.unit_name, null) orelse {
-            return RuntimeError.UndefinedVariable;
-        };
+        const unit_val = try self.unit_expr.evaluate(allocator);
+        if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
+        const unit_dq = unit_val.display_quantity;
 
-        return LiteralValue{ .quantity = u.from(num) };
+        return LiteralValue{ .display_quantity = DisplayQuantity{
+            .value = num,
+            .dim = unit_dq.dim,
+            .unit = unit_dq.unit,
+            .mode = .none,
+            .is_delta = false,
+        } };
     }
 };
 
@@ -224,27 +248,26 @@ pub const Display = struct {
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
         const val = try self.expr.evaluate(allocator);
-        if (val != .quantity) return RuntimeError.InvalidOperand;
+        if (val != .display_quantity) return RuntimeError.InvalidOperand;
 
-        const q = val.quantity;
+        const dq = val.display_quantity;
 
         // Ensure target unit exists
-        const u = dim.findUnitAllDynamic(self.target_unit, null) orelse {
+        const u = findUnitAllDynamic(self.target_unit, null) orelse {
             return RuntimeError.UndefinedVariable;
         };
 
         // Ensure dimensions match
-        if (!dim.Dimension.eql(q.dim, u.dim)) {
+        if (!Dimension.eql(dq.dim, u.dim)) {
             return RuntimeError.InvalidOperands;
         }
 
-        // Keep canonical value, but override display unit + mode
-        return LiteralValue{ .quantity = dim.DisplayQuantity{
-            .value = q.value,
-            .dim = q.dim,
+        return LiteralValue{ .display_quantity = DisplayQuantity{
+            .value = dq.value,
+            .dim = dq.dim,
             .unit = self.target_unit,
             .mode = self.mode orelse .none,
-            .is_delta = q.is_delta,
+            .is_delta = dq.is_delta,
         } };
     }
 };
@@ -268,18 +291,18 @@ pub const UnitExpr = struct {
         _ = allocator;
 
         // Look up the unit definition
-        const u = dim.findUnitAllDynamic(self.name, null) orelse {
+        const u = findUnitAllDynamic(self.name, null) orelse {
             return RuntimeError.UndefinedVariable;
         };
 
         // Raise the unit’s dimension to the exponent
         var dim_accum = u.dim;
         if (self.exponent != 1) {
-            dim_accum = dim.Dimension.pow(u.dim, self.exponent);
+            dim_accum = Dimension.pow(u.dim, self.exponent);
         }
 
         // Return a DisplayQuantity with value=1.0 (pure unit factor)
-        return LiteralValue{ .display_quantity = dim.DisplayQuantity{
+        return LiteralValue{ .display_quantity = DisplayQuantity{
             .value = 1.0,
             .dim = dim_accum,
             .unit = self.name,
@@ -322,35 +345,42 @@ pub const CompoundUnit = struct {
         const lq = left_val.display_quantity;
         const rq = right_val.display_quantity;
 
-        var new_dim: dim.Dimension = undefined;
+        var new_dim: Dimension = undefined;
         var new_val: f64 = undefined;
 
         switch (self.op.type) {
             .Star => {
-                new_dim = dim.Dimension.add(lq.dim, rq.dim);
+                new_dim = Dimension.add(lq.dim, rq.dim);
                 new_val = lq.value * rq.value;
             },
             .Slash => {
-                new_dim = dim.Dimension.sub(lq.dim, rq.dim);
+                new_dim = Dimension.sub(lq.dim, rq.dim);
                 new_val = lq.value / rq.value;
             },
             else => return RuntimeError.UnsupportedOperator,
         }
 
         const unit_str = try self.toString(allocator);
+        defer allocator.free(unit_str);
+        const normalized_unit = try Format.normalizeUnitString(
+            allocator,
+            new_dim,
+            unit_str,
+            SiRegistry,
+        );
 
         return LiteralValue{
-            .display_quantity = dim.DisplayQuantity{
+            .display_quantity = DisplayQuantity{
                 .value = new_val,
                 .dim = new_dim,
-                .unit = unit_str, // you could build a string like "m/s^2"
+                .unit = normalized_unit,
                 .mode = .none,
                 .is_delta = false,
             },
         };
     }
 
-    pub fn toString(self: CompoundUnit, allocator: std.mem.Allocator) ![]u8 {
+    pub fn toString(self: CompoundUnit, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
         const left_str = try self.left.toUnitString(allocator);
         defer allocator.free(left_str);
 
@@ -377,7 +407,7 @@ pub const Expr = union(enum) {
 
     pub fn toUnitString(self: *Expr, allocator: std.mem.Allocator) ![]u8 {
         return switch (self.*) {
-            .unit_expr => |ue| ue.toString(allocator),
+            .unit_expr => |ue| try ue.toString(allocator),
             .compound_unit => |cu| cu.toString(allocator),
             else => std.fmt.allocPrint(allocator, "<?>", .{}),
         };
@@ -416,13 +446,13 @@ pub const Expr = union(enum) {
 fn isEqual(left: LiteralValue, right: LiteralValue) bool {
     if (left == .nil and right == .nil) return true;
     if (left == .nil or right == .nil) return false;
-
     if (!std.mem.eql(u8, @tagName(left), @tagName(right))) return false;
 
     return switch (left) {
         .number => |ln| right.number == ln,
         .string => |ls| std.mem.eql(u8, ls, right.string),
         .boolean => |lb| right.boolean == lb,
+        .display_quantity => |lq| Dimension.eql(lq.dim, right.display_quantity.dim) and (lq.value == right.display_quantity.value),
         else => unreachable,
     };
 }
@@ -469,9 +499,9 @@ test "AST Printer test" {
     defer allocator.destroy(binary_ptr);
 
     // New: use AllocatingWriter instead of fixedBufferStream
-    var aw = std.Io.AllocatingWriter.init(allocator);
+    var aw = std.io.FixedBufferAllocator.init(allocator);
     defer aw.deinit();
-    const w: *std.Io.Writer = &aw.writer;
+    const w = &aw.writer();
 
     try binary_ptr.print(w);
 

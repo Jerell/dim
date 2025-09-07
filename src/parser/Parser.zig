@@ -1,20 +1,35 @@
 const std = @import("std");
 const Token = @import("Token.zig").Token;
 const TokenType = @import("TokenType.zig").TokenType;
+const FormatMode = @import("../format.zig").FormatMode;
 const ast_expr = @import("Expressions.zig");
 const errors = @import("errors.zig");
+const Io = @import("../Io.zig").Io;
+
+const ParseError = error{
+    ExpectedToken,
+    UnexpectedToken,
+    ExpectedExpression,
+    OutOfMemory,
+};
 
 pub const Parser = struct {
     tokens: []const Token,
     current: usize,
     allocator: std.mem.Allocator,
     hadError: bool = false,
+    io: *Io,
 
-    pub fn init(allocator: std.mem.Allocator, tokens: []const Token) Parser {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        tokens: []const Token,
+        io: *Io,
+    ) Parser {
         return Parser{
             .tokens = tokens,
             .current = 0,
             .allocator = allocator,
+            .io = io,
         };
     }
 
@@ -27,12 +42,12 @@ pub const Parser = struct {
         return expr;
     }
 
-    fn conversion(self: *Parser) !*ast_expr.Expr {
+    fn conversion(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.expression();
 
         if (self.match(&.{TokenType.In})) {
             const unit_tok = try self.consume(TokenType.Identifier, "Expected unit after 'in'");
-            var mode: ?ast_expr.FormatMode = null;
+            var mode: ?FormatMode = null;
 
             if (self.match(&.{TokenType.Colon})) {
                 const mode_tok = try self.consume(TokenType.Identifier, "Expected format mode after ':'");
@@ -53,11 +68,11 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn expression(self: *Parser) !*ast_expr.Expr {
+    fn expression(self: *Parser) ParseError!*ast_expr.Expr {
         return self.comparison();
     }
 
-    fn comparison(self: *Parser) !*ast_expr.Expr {
+    fn comparison(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.term();
 
         while (self.match(&.{
@@ -84,7 +99,7 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn term(self: *Parser) !*ast_expr.Expr {
+    fn term(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.factor();
 
         while (self.match(&.{ TokenType.Plus, TokenType.Minus })) {
@@ -104,7 +119,7 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn factor(self: *Parser) !*ast_expr.Expr {
+    fn factor(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.power();
 
         while (self.match(&.{ TokenType.Star, TokenType.Slash })) {
@@ -124,7 +139,7 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn power(self: *Parser) !*ast_expr.Expr {
+    fn power(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.unary();
 
         if (self.match(&.{TokenType.Caret})) {
@@ -143,7 +158,7 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn unary(self: *Parser) !*ast_expr.Expr {
+    fn unary(self: *Parser) ParseError!*ast_expr.Expr {
         if (self.match(&.{ TokenType.Minus, TokenType.Bang })) {
             const op = self.previous();
             const right = try self.unary();
@@ -160,7 +175,7 @@ pub const Parser = struct {
         return self.primary();
     }
 
-    fn primary(self: *Parser) !*ast_expr.Expr {
+    fn primary(self: *Parser) ParseError!*ast_expr.Expr {
         if (self.match(&.{TokenType.Number})) {
             const lit = self.previous().literal.?;
             const num_node = try self.allocator.create(ast_expr.Expr);
@@ -197,7 +212,7 @@ pub const Parser = struct {
         return self.reportParseError(self.peek(), "Expect expression.");
     }
 
-    fn parseUnitExpr(self: *Parser) !*ast_expr.Expr {
+    fn parseUnitExpr(self: *Parser) ParseError!*ast_expr.Expr {
         var expr_ptr = try self.parseUnitTerm();
 
         while (self.match(&.{ TokenType.Star, TokenType.Slash })) {
@@ -218,7 +233,7 @@ pub const Parser = struct {
         return expr_ptr;
     }
 
-    fn parseUnitTerm(self: *Parser) !*ast_expr.Expr {
+    fn parseUnitTerm(self: *Parser) ParseError!*ast_expr.Expr {
         const id_tok = try self.consume(TokenType.Identifier, "Expected unit identifier");
         var exponent: i32 = 1;
 
@@ -271,14 +286,14 @@ pub const Parser = struct {
         return self.tokens[self.current - 1];
     }
 
-    fn consume(self: *Parser, t: TokenType, msg: []const u8) !Token {
+    fn consume(self: *Parser, t: TokenType, msg: []const u8) ParseError!Token {
         if (self.check(t)) return self.advance();
         return self.reportParseError(self.peek(), msg);
     }
 
     fn reportParseError(self: *Parser, token: Token, message: []const u8) ParseError {
         self.hadError = true;
-        reportTokenError(self.allocator, token, message);
+        reportTokenError(self.allocator, token, message, self.io);
         return ParseError.ExpectedToken;
     }
 };
@@ -287,19 +302,13 @@ pub fn reportTokenError(
     allocator: std.mem.Allocator,
     token: Token,
     message: []const u8,
+    io: *Io,
 ) void {
-    if (token.type == .EOF) {
-        errors.report(token.line, " at end", message);
+    if (token.type == .Eof) {
+        io.eprintf("[line {}] Error at end: {s}\n", .{ token.line, message }) catch {};
     } else {
         const msg_prefix = std.fmt.allocPrint(allocator, " at '{s}'", .{token.lexeme}) catch " at token";
         defer allocator.free(msg_prefix);
-        errors.report(token.line, msg_prefix, message);
+        io.eprintf("[line {}] Error{s}: {s}\n", .{ token.line, msg_prefix, message }) catch {};
     }
 }
-
-const ParseError = error{
-    ExpectedToken,
-    UnexpectedToken,
-    ExpectedExpression,
-    OutOfMemory,
-};

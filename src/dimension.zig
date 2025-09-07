@@ -39,6 +39,18 @@ pub const Dimension = struct {
         return a.L == b.L and a.M == b.M and a.T == b.T and
             a.I == b.I and a.Th == b.Th and a.N == b.N and a.J == b.J;
     }
+
+    pub fn pow(self: Dimension, exponent: i32) Dimension {
+        return .{
+            .L = self.L * exponent,
+            .M = self.M * exponent,
+            .T = self.T * exponent,
+            .I = self.I * exponent,
+            .Th = self.Th * exponent,
+            .N = self.N * exponent,
+            .J = self.J * exponent,
+        };
+    }
 };
 
 pub const DIM = struct {

@@ -3,18 +3,23 @@ const Token = @import("Token.zig").Token;
 const TokenType = @import("TokenType.zig").TokenType;
 const LiteralValue = @import("Expressions.zig").LiteralValue;
 const errors = @import("errors.zig");
+const Io = @import("../Io.zig").Io;
 
 pub const Scanner = struct {
     source: []const u8,
-    tokens: std.ArrayList(Token),
+    tokens: std.ArrayListUnmanaged(Token),
+    allocator: std.mem.Allocator,
+    io: *Io,
     start: usize,
     current: usize,
     line: usize,
 
-    pub fn init(allocator: std.mem.Allocator, source: []const u8) !Scanner {
+    pub fn init(allocator: std.mem.Allocator, io: *Io, source: []const u8) !Scanner {
         return .{
             .source = source,
-            .tokens = std.ArrayList(Token).init(allocator),
+            .tokens = .{},
+            .allocator = allocator,
+            .io = io,
             .start = 0,
             .current = 0,
             .line = 1,
@@ -71,7 +76,7 @@ pub const Scanner = struct {
                 } else if (isAlpha(c)) {
                     try self.identifier();
                 } else {
-                    errors.reportError(self.line, "unexpected character");
+                    errors.reportError(self.io, self.line, "unexpected character");
                 }
             },
         }
@@ -84,7 +89,12 @@ pub const Scanner = struct {
 
     fn addToken(self: *Scanner, token_type: TokenType, literal: ?LiteralValue) !void {
         const text = self.source[self.start..self.current];
-        try self.tokens.append(Token.init(token_type, text, literal, self.line));
+        try self.tokens.append(self.allocator, Token.init(
+            token_type,
+            text,
+            literal,
+            self.line,
+        ));
     }
 
     fn match(self: *Scanner, expected: u8) bool {
@@ -141,11 +151,11 @@ pub const Scanner = struct {
 
         const num_str = self.source[self.start..self.current];
         const value = std.fmt.parseFloat(f64, num_str) catch {
-            errors.reportError(self.line, "Invalid number format");
+            errors.reportError(self.io, self.line, "Invalid number format");
             return;
         };
 
-        try self.addToken(TokenType.NUMBER, LiteralValue{ .number = value });
+        try self.addToken(TokenType.Number, LiteralValue{ .number = value });
     }
 
     fn identifier(self: *Scanner) !void {
@@ -180,29 +190,4 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
 
 fn identifierType(text: []const u8) TokenType {
     return keywords.get(text) orelse TokenType.Identifier;
-}
-
-fn parseConversion(self: *Parser) !*Expr {
-    var expr = try self.parseExpression();
-
-    if (self.match(.IN)) {
-        const unit_tok = try self.consume(.IDENTIFIER, "Expected unit after 'in'");
-        var mode: ?Format.FormatMode = null;
-
-        if (self.match(.COLON)) {
-            const mode_tok = try self.consume(.IDENTIFIER, "Expected format mode after ':'");
-            if (std.mem.eql(u8, mode_tok.lexeme, "scientific")) mode = .scientific
-            else if (std.mem.eql(u8, mode_tok.lexeme, "engineering")) mode = .engineering
-            else if (std.mem.eql(u8, mode_tok.lexeme, "auto")) mode = .auto
-            else mode = .none;
-        }
-
-        expr = self.allocExpr(.display, Display{
-            .expr = expr,
-            .target_unit = unit_tok.lexeme,
-            .mode = mode,
-        });
-    }
-
-    return expr;
 }

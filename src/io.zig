@@ -54,15 +54,27 @@ pub const Io = struct {
         allocator: std.mem.Allocator,
         limit: usize,
     ) ![]u8 {
-        var aw = std.Io.AllocatingWriter.init(allocator);
-        defer aw.deinit();
-        const w: *std.Io.Writer = &aw.writer;
+        // Use the reader's takeDelimiterExclusive method which returns a slice
+        // from the buffered data, or build it manually if needed
+        var list = std.ArrayListUnmanaged(u8){};
 
-        // streamDelimiterLimit writes the bytes before the delimiter into w.
-        // Use .limited(limit) to bound the logical line length.
-        _ = try self.inp.streamDelimiterLimit(w, '\n', .limited(limit));
+        // Read bytes one by one until newline or limit
+        var read_count: usize = 0;
+        while (read_count < limit) {
+            const byte = self.inp.*.takeByte() catch |err| switch (err) {
+                error.EndOfStream => break,
+                else => return err,
+            };
 
-        return aw.written(); // owned by allocator
+            if (byte == '\n') break;
+
+            try list.append(allocator, byte);
+            read_count += 1;
+        }
+
+        if (read_count == limit) return error.StreamTooLong;
+
+        return list.toOwnedSlice(allocator);
     }
 
     pub fn flushAll(self: *Io) !void {

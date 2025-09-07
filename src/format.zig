@@ -115,16 +115,50 @@ pub fn normalizeUnitString(
     }
 
     // 2) Prefer a registry unit that matches the full dimension (e.g., m/s, m/s², N)
-    //    and is canonical (scale == 1.0) to avoid picking prefixed units like cm/km here.
+    // Prefer canonical symbols (scale == 1.0). If none, still fall back to the first match.
+    var any_match: ?[]const u8 = null;
     for (reg.units) |u| {
-        if (Dimension.eql(u.dim, dim) and u.scale == 1.0) {
-            return try std.fmt.allocPrint(allocator, "{s}", .{u.symbol});
+        if (Dimension.eql(u.dim, dim)) {
+            if (u.scale == 1.0) {
+                return try std.fmt.allocPrint(allocator, "{s}", .{u.symbol});
+            }
+            if (any_match == null) any_match = u.symbol;
         }
+    }
+    if (any_match) |sym| {
+        return try std.fmt.allocPrint(allocator, "{s}", .{sym});
     }
 
     // 3) Build a canonical SI expression from the dimension, with a simple greedy
     //    factoring of one derived unit (if it reduces complexity), then base units.
     var rem = dim;
+
+    // Detect base units from registry by looking for scale==1.0 and basis dimensions.
+    var baseL: ?[]const u8 = null;
+    var baseM: ?[]const u8 = null;
+    var baseT: ?[]const u8 = null;
+    var baseI: ?[]const u8 = null;
+    var baseTh: ?[]const u8 = null;
+    var baseN: ?[]const u8 = null;
+    var baseJ: ?[]const u8 = null;
+
+    const isBasis = struct {
+        fn call(d: Dimension, l: i32, m: i32, t: i32, i: i32, th: i32, n: i32, j: i32) bool {
+            return d.L == l and d.M == m and d.T == t and d.I == i and d.Th == th and d.N == n and d.J == j;
+        }
+    }.call;
+
+    for (reg.units) |u| {
+        if (u.scale != 1.0) continue;
+        const d = u.dim;
+        if (baseL == null and isBasis(d, 1, 0, 0, 0, 0, 0, 0)) baseL = u.symbol;
+        if (baseM == null and isBasis(d, 0, 1, 0, 0, 0, 0, 0)) baseM = u.symbol;
+        if (baseT == null and isBasis(d, 0, 0, 1, 0, 0, 0, 0)) baseT = u.symbol;
+        if (baseI == null and isBasis(d, 0, 0, 0, 1, 0, 0, 0)) baseI = u.symbol;
+        if (baseTh == null and isBasis(d, 0, 0, 0, 0, 1, 0, 0)) baseTh = u.symbol;
+        if (baseN == null and isBasis(d, 0, 0, 0, 0, 0, 1, 0)) baseN = u.symbol;
+        if (baseJ == null and isBasis(d, 0, 0, 0, 0, 0, 0, 1)) baseJ = u.symbol;
+    }
 
     // Try picking one non-base derived unit that reduces complexity (N, J, W, Pa, m/s, m/s², etc.)
     const is_base_unit = struct {
@@ -173,43 +207,43 @@ pub fn normalizeUnitString(
     // Emit numerator base units
     if (rem.M > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("kg");
+        try w.writeAll(baseM orelse "kg");
         if (rem.M != 1) try w.print("^{d}", .{rem.M});
         wrote_any = true;
     }
     if (rem.L > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("m");
+        try w.writeAll(baseL orelse "m");
         if (rem.L != 1) try w.print("^{d}", .{rem.L});
         wrote_any = true;
     }
     if (rem.T > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("s");
+        try w.writeAll(baseT orelse "s");
         if (rem.T != 1) try w.print("^{d}", .{rem.T});
         wrote_any = true;
     }
     if (rem.I > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("A");
+        try w.writeAll(baseI orelse "A");
         if (rem.I != 1) try w.print("^{d}", .{rem.I});
         wrote_any = true;
     }
     if (rem.Th > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("K");
+        try w.writeAll(baseTh orelse "K");
         if (rem.Th != 1) try w.print("^{d}", .{rem.Th});
         wrote_any = true;
     }
     if (rem.N > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("mol");
+        try w.writeAll(baseN orelse "mol");
         if (rem.N != 1) try w.print("^{d}", .{rem.N});
         wrote_any = true;
     }
     if (rem.J > 0) {
         if (wrote_any) try w.writeAll("*");
-        try w.writeAll("cd");
+        try w.writeAll(baseJ orelse "cd");
         if (rem.J != 1) try w.print("^{d}", .{rem.J});
         wrote_any = true;
     }
@@ -225,49 +259,49 @@ pub fn normalizeUnitString(
         var need_sep = false;
         if (rem.M < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("kg");
+            try w.writeAll(baseM orelse "kg");
             const p = -rem.M;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.L < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("m");
+            try w.writeAll(baseL orelse "m");
             const p = -rem.L;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.T < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("s");
+            try w.writeAll(baseT orelse "s");
             const p = -rem.T;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.I < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("A");
+            try w.writeAll(baseI orelse "A");
             const p = -rem.I;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.Th < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("K");
+            try w.writeAll(baseTh orelse "K");
             const p = -rem.Th;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.N < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("mol");
+            try w.writeAll(baseN orelse "mol");
             const p = -rem.N;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;
         }
         if (rem.J < 0) {
             if (need_sep) try w.writeAll("*");
-            try w.writeAll("cd");
+            try w.writeAll(baseJ orelse "cd");
             const p = -rem.J;
             if (p != 1) try w.print("^{d}", .{p});
             need_sep = true;

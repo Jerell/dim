@@ -233,44 +233,58 @@ pub fn normalizeUnitString(
         wrote_any = true;
     }
 
+    // If the remaining dimension matches a single registry unit exactly,
+    // emit that symbol directly (e.g., rem = Area -> "m²").
+    var handled_rem = false;
+    for (reg.units) |u| {
+        if (u.scale != 1.0) continue;
+        if (Dimension.eql(u.dim, rem)) {
+            if (wrote_any) try w.writeAll("*");
+            try w.writeAll(u.symbol);
+            wrote_any = true;
+            handled_rem = true;
+            break;
+        }
+    }
+
     // Emit numerator base units
-    if (rem.M > 0) {
+    if (!handled_rem and rem.M > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseM orelse "kg");
         if (rem.M != 1) try w.print("^{d}", .{rem.M});
         wrote_any = true;
     }
-    if (rem.L > 0) {
+    if (!handled_rem and rem.L > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseL orelse "m");
         if (rem.L != 1) try w.print("^{d}", .{rem.L});
         wrote_any = true;
     }
-    if (rem.T > 0) {
+    if (!handled_rem and rem.T > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseT orelse "s");
         if (rem.T != 1) try w.print("^{d}", .{rem.T});
         wrote_any = true;
     }
-    if (rem.I > 0) {
+    if (!handled_rem and rem.I > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseI orelse "A");
         if (rem.I != 1) try w.print("^{d}", .{rem.I});
         wrote_any = true;
     }
-    if (rem.Th > 0) {
+    if (!handled_rem and rem.Th > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseTh orelse "K");
         if (rem.Th != 1) try w.print("^{d}", .{rem.Th});
         wrote_any = true;
     }
-    if (rem.N > 0) {
+    if (!handled_rem and rem.N > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseN orelse "mol");
         if (rem.N != 1) try w.print("^{d}", .{rem.N});
         wrote_any = true;
     }
-    if (rem.J > 0) {
+    if (!handled_rem and rem.J > 0) {
         if (wrote_any) try w.writeAll("*");
         try w.writeAll(baseJ orelse "cd");
         if (rem.J != 1) try w.print("^{d}", .{rem.J});
@@ -278,7 +292,7 @@ pub fn normalizeUnitString(
     }
 
     // Emit denominator base units
-    const has_den = (rem.M < 0) or (rem.L < 0) or (rem.T < 0) or (rem.I < 0) or (rem.Th < 0) or (rem.N < 0) or (rem.J < 0);
+    const has_den = (!handled_rem) and ((rem.M < 0) or (rem.L < 0) or (rem.T < 0) or (rem.I < 0) or (rem.Th < 0) or (rem.N < 0) or (rem.J < 0));
     if (has_den) {
         if (!wrote_any) {
             try w.writeAll("1");

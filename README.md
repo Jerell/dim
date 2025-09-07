@@ -113,15 +113,31 @@ pub fn main() !void {
 
 ### CLI
 
+Usage:
+
 ```bash
-$ dim 10 celsius + 20 fahrenheit
-293.15 K
+dim                 Start REPL (or read from stdin if piped)
+dim "<expr>"        Evaluate a single expression
+dim --file <path>   Evaluate each non-empty line in <path>
+dim -               Read from stdin (one or more lines)
+```
 
-$ dim 1 bar + 50 kPa
-150.0 kPa
+Examples:
 
-$ dim 5 m / 2 s in km/h
-9.0 km/h
+```bash
+$ dim "1 m + 2 m"
+3.000 m
+
+$ printf "1 m + 2 m\n2 m in km\n" | dim
+3.000 m
+0.002 km
+
+$ dim --file test.dim
+# evaluates each non-empty line and prints a result per line
+
+$ dim
+> 1 m + 2 m
+3.000 m
 ```
 
 ---
@@ -131,19 +147,6 @@ $ dim 5 m / 2 s in km/h
 - [Rust `uom`](https://crates.io/crates/uom) — type-safe zero-cost units of measure.
 - [Julia `Unitful`](https://github.com/PainterQubits/Unitful.jl) and [DynamicQuantities](https://github.com/JuliaPhysics/DynamicQuantities.jl).
 - [Crafting Interpreters](https://craftinginterpreters.com/) — for the CLI parser design.
-
----
-
-## 🔮 Future Ideas
-
-- Runtime parsing of unit strings (`"10 kPa"` → `Quantity(Pressure)`).
-- Configurable default output units (e.g. always show pressure in bar).
-- Support for physical constants (`c`, `G`, `R`, …).
-- More advanced CLI features:
-  - Parentheses in expressions.
-  - Exponents (`m^2`, `s^-1`).
-  - Unit simplification (`N·m` → `J`).
-- Integration with plotting/visualization tools.
 
 ---
 

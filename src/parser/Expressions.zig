@@ -252,11 +252,18 @@ pub const Unit = struct {
         const unit_dq = unit_val.display_quantity;
 
         // Multiply by unit conversion factor to get canonical value
-        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{unit_dq.unit});
+        const fallback = try self.unit_expr.toUnitString(allocator);
+        defer allocator.free(fallback);
+        const normalized_unit = try Format.normalizeUnitString(
+            allocator,
+            unit_dq.dim,
+            fallback,
+            SiRegistry,
+        );
         return LiteralValue{ .display_quantity = DisplayQuantity{
             .value = num * unit_dq.value,
             .dim = unit_dq.dim,
-            .unit = unit_copy,
+            .unit = normalized_unit,
             .mode = .none,
             .is_delta = false,
         } };
@@ -407,18 +414,13 @@ pub const CompoundUnit = struct {
 
         const unit_str = try self.toString(allocator);
         defer allocator.free(unit_str);
-        const normalized_unit = try Format.normalizeUnitString(
-            allocator,
-            new_dim,
-            unit_str,
-            SiRegistry,
-        );
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{unit_str});
 
         return LiteralValue{
             .display_quantity = rt.DisplayQuantity{
                 .value = new_val,
                 .dim = new_dim,
-                .unit = normalized_unit,
+                .unit = unit_copy,
                 .mode = .none,
                 .is_delta = false,
             },

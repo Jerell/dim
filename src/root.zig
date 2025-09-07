@@ -1,12 +1,22 @@
 const std = @import("std");
 
 pub const Dimension = @import("Dimension.zig").Dimension;
-pub const Quantity = @import("Quantity.zig").Quantity;
+pub const Quantity = @import("quantity.zig").Quantity;
 pub const DIM = @import("Dimension.zig").DIM;
 pub const Unit = @import("Unit.zig").Unit;
 pub const Alias = @import("Unit.zig").Alias;
 pub const Prefix = @import("Unit.zig").Prefix;
 pub const UnitRegistry = @import("Unit.zig").UnitRegistry;
+
+// Re-export runtime types and helpers
+pub const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
+pub const addDisplay = @import("runtime.zig").addDisplay;
+pub const subDisplay = @import("runtime.zig").subDisplay;
+pub const mulDisplay = @import("runtime.zig").mulDisplay;
+pub const divDisplay = @import("runtime.zig").divDisplay;
+
+// Re-export formatting API
+pub const Format = @import("format.zig");
 
 const _si = @import("registry/Si.zig");
 const _imperial = @import("registry/Imperial.zig");

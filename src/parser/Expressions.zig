@@ -1,12 +1,13 @@
 const std = @import("std");
-const TokenType = @import("tokentype.zig").TokenType;
+const TokenType = @import("TokenType.zig").TokenType;
 const Token = @import("Token.zig").Token;
-const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
-const rt = @import("runtime.zig");
-const findUnitAllDynamic = @import("dim").findUnitAllDynamic;
-const Dimension = @import("dim").Dimension;
-const SiRegistry = @import("dim").Registries.si;
-const Format = @import("../format.zig");
+const dim = @import("dim");
+const DisplayQuantity = dim.DisplayQuantity;
+const rt = dim;
+const findUnitAllDynamic = dim.findUnitAllDynamic;
+const Dimension = dim.Dimension;
+const SiRegistry = dim.Registries.si;
+const Format = dim.Format;
 
 pub const RuntimeError = error{
     InvalidOperands,
@@ -125,7 +126,8 @@ pub const Binary = struct {
             .Plus => {
                 if (both_numbers) return .{ .number = left.number + right.number };
                 if (both_quant) {
-                    const dq = try rt.addDisplay(left.display_quantity, right.display_quantity);
+                    const dq = rt.addDisplay(left.display_quantity, right.display_quantity)
+                        catch return RuntimeError.InvalidOperands;
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -133,7 +135,8 @@ pub const Binary = struct {
             .Minus => {
                 if (both_numbers) return .{ .number = left.number - right.number };
                 if (both_quant) {
-                    const dq = try rt.subDisplay(left.display_quantity, right.display_quantity);
+                    const dq = rt.subDisplay(left.display_quantity, right.display_quantity)
+                        catch return RuntimeError.InvalidOperands;
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -262,7 +265,7 @@ pub const Display = struct {
             return RuntimeError.InvalidOperands;
         }
 
-        return LiteralValue{ .display_quantity = DisplayQuantity{
+        return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = dq.value,
             .dim = dq.dim,
             .unit = self.target_unit,
@@ -302,7 +305,7 @@ pub const UnitExpr = struct {
         }
 
         // Return a DisplayQuantity with value=1.0 (pure unit factor)
-        return LiteralValue{ .display_quantity = DisplayQuantity{
+        return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = 1.0,
             .dim = dim_accum,
             .unit = self.name,
@@ -370,7 +373,7 @@ pub const CompoundUnit = struct {
         );
 
         return LiteralValue{
-            .display_quantity = DisplayQuantity{
+            .display_quantity = rt.DisplayQuantity{
                 .value = new_val,
                 .dim = new_dim,
                 .unit = normalized_unit,

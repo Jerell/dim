@@ -1,7 +1,7 @@
 const std = @import("std");
 const Dimension = @import("Dimension.zig").Dimension;
-const Quantity = @import("Quantity.zig").Quantity;
-const DisplayQuantity = @import("parser/runtime.zig").DisplayQuantity;
+const Quantity = @import("quantity.zig").Quantity;
+const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
 
 pub const Unit = struct {
     dim: Dimension,

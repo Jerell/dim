@@ -1,6 +1,6 @@
 const std = @import("std");
-const Dimension = @import("../Dimension.zig");
-const Format = @import("../format.zig");
+const Dimension = @import("Dimension.zig").Dimension;
+const Format = @import("format.zig");
 
 pub const DisplayQuantity = struct {
     value: f64, // canonical
@@ -19,9 +19,8 @@ pub const DisplayQuantity = struct {
     }
 };
 
-pub fn addDisplay(a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    if (!Dimension.eql(a.dim, b.dim)) return error.MismatchedDimensions;
-    // temperature delta rules could be added here if you track is_delta per dim
+pub fn addDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}!DisplayQuantity {
+    if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     return DisplayQuantity{
         .value = a.value + b.value,
         .dim = a.dim,
@@ -31,8 +30,8 @@ pub fn addDisplay(a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     };
 }
 
-pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    if (!Dimension.eql(a.dim, b.dim)) return error.MismatchedDimensions;
+pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}!DisplayQuantity {
+    if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     return DisplayQuantity{
         .value = a.value - b.value,
         .dim = a.dim,
@@ -44,16 +43,11 @@ pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
 
 pub fn mulDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
     const new_dim = Dimension.add(a.dim, b.dim);
-    // Build a normalized alias if available, otherwise base-units expression
-    // const raw = /* build "a.unit*b.unit" dynamically if you want, else empty */;
-    // If you have a helper to normalize from dim only:
-    const norm = Format.aliasForDimOrBase(new_dim) // return []u8 or []const u8
-    // If you need allocation, adapt to your allocator model.
-    ;
+    // For now, leave unit blank; pretty-printing can normalize later when needed
     return DisplayQuantity{
         .value = a.value * b.value,
         .dim = new_dim,
-        .unit = norm,
+        .unit = "",
         .mode = .none,
         .is_delta = false,
     };
@@ -61,12 +55,13 @@ pub fn mulDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
 
 pub fn divDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
     const new_dim = Dimension.sub(a.dim, b.dim);
-    const norm = Format.aliasForDimOrBase(new_dim);
     return DisplayQuantity{
         .value = a.value / b.value,
         .dim = new_dim,
-        .unit = norm,
+        .unit = "",
         .mode = .none,
         .is_delta = false,
     };
 }
+
+

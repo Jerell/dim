@@ -2,7 +2,7 @@ const std = @import("std");
 const Unit = @import("Unit.zig").Unit;
 const UnitRegistry = @import("Unit.zig").UnitRegistry;
 const Dimension = @import("Dimension.zig").Dimension;
-const SiPrefixes = @import("registry/si.zig").Registry.prefixes;
+const SiPrefixes = @import("registry/Si.zig").Registry.prefixes;
 
 pub const FormatMode = enum { auto, none, scientific, engineering };
 

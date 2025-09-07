@@ -3,7 +3,6 @@ const dim = @import("dim");
 const Io = @import("./Io.zig").Io;
 const Scanner = @import("parser/Scanner.zig").Scanner;
 const Parser = @import("parser/Parser.zig").Parser;
-const Expr = @import("parser/Expressions.zig").Expr;
 
 pub fn main() !void {
     var io = Io.init();

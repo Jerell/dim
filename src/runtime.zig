@@ -20,6 +20,16 @@ pub const DisplayQuantity = struct {
     }
 };
 
+pub fn scaleDisplay(dq: DisplayQuantity, factor: f64) DisplayQuantity {
+    return DisplayQuantity{
+        .value = dq.value * factor,
+        .dim = dq.dim,
+        .unit = dq.unit,
+        .mode = dq.mode,
+        .is_delta = dq.is_delta,
+    };
+}
+
 pub fn addDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}!DisplayQuantity {
     if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     return DisplayQuantity{

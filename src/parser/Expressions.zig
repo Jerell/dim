@@ -145,6 +145,14 @@ pub const Binary = struct {
                     const dq = try rt.mulDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
+                if (left == .display_quantity and right == .number) {
+                    const dq = rt.scaleDisplay(left.display_quantity, right.number);
+                    return .{ .display_quantity = dq };
+                }
+                if (left == .number and right == .display_quantity) {
+                    const dq = rt.scaleDisplay(right.display_quantity, left.number);
+                    return .{ .display_quantity = dq };
+                }
                 return RuntimeError.InvalidOperands;
             },
             .Slash => {
@@ -155,6 +163,11 @@ pub const Binary = struct {
                 if (both_quant) {
                     if (right.display_quantity.value == 0) return RuntimeError.DivisionByZero;
                     const dq = try rt.divDisplay(allocator, left.display_quantity, right.display_quantity);
+                    return .{ .display_quantity = dq };
+                }
+                if (left == .display_quantity and right == .number) {
+                    if (right.number == 0) return RuntimeError.DivisionByZero;
+                    const dq = rt.scaleDisplay(left.display_quantity, 1.0 / right.number);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;

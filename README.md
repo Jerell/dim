@@ -40,10 +40,9 @@ $ dim "1 bar in kPa"
   - Parse expressions like `10 celsius + 20 fahrenheit in kelvin`.
   - Support arithmetic (`+`, `-`, `*`, `/`).
   - Support derived units (`m/s`, `N`, `J`).
-  - Default output in canonical SI units with smart formatting.
-  - Optional `in <unit>` to force output in a specific unit.
+  - `in <unit>` to force output in a specific unit.
   - REPL mode for interactive calculations.
-  - Configurable formatting (`--scientific`, `--engineering`).
+  - Configurable formatting (`:scientific`, `:engineering`, `:auto`, `:none`).
 
 ---
 

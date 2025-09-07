@@ -219,10 +219,16 @@ pub const Unit = struct {
         if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
         const unit_dq = unit_val.display_quantity;
 
+        // Resolve the unit and convert numeric value to canonical
+        const u = findUnitAllDynamic(unit_dq.unit, null) orelse {
+            return RuntimeError.UndefinedVariable;
+        };
+
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{unit_dq.unit});
         return LiteralValue{ .display_quantity = DisplayQuantity{
-            .value = num,
-            .dim = unit_dq.dim,
-            .unit = unit_dq.unit,
+            .value = u.toCanonical(num),
+            .dim = u.dim,
+            .unit = unit_copy,
             .mode = .none,
             .is_delta = false,
         } };
@@ -263,10 +269,11 @@ pub const Display = struct {
             return RuntimeError.InvalidOperands;
         }
 
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{self.target_unit});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = dq.value,
             .dim = dq.dim,
-            .unit = self.target_unit,
+            .unit = unit_copy,
             .mode = self.mode orelse .none,
             .is_delta = dq.is_delta,
         } };
@@ -289,7 +296,6 @@ pub const UnitExpr = struct {
         self: *UnitExpr,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-        _ = allocator;
 
         // Look up the unit definition
         const u = findUnitAllDynamic(self.name, null) orelse {
@@ -303,10 +309,11 @@ pub const UnitExpr = struct {
         }
 
         // Return a DisplayQuantity with value=1.0 (pure unit factor)
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{self.name});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = 1.0,
             .dim = dim_accum,
-            .unit = self.name,
+            .unit = unit_copy,
             .mode = .none,
             .is_delta = false,
         } };

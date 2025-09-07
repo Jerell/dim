@@ -6,6 +6,7 @@ const Parser = @import("parser/Parser.zig").Parser;
 
 pub fn main() !void {
     var io = Io.init();
+    io.setup();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -76,8 +77,13 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         .string => |s| try io.printf("{s}\n", .{s}),
         .boolean => |b| try io.printf("{}\n", .{b}),
         .display_quantity => |dq| {
-            try dq.format(io.writer());
-            try io.writeAll("\n");
+            if (dim.findUnitAll(dq.unit)) |u| {
+                try dim.Format.formatQuantityAsUnit(io.writer(), dq, u, dq.mode);
+                try io.writeAll("\n");
+            } else {
+                // Fallback: raw value and unit
+                try io.printf("{d:.3} {s}\n", .{ dq.value, dq.unit });
+            }
         },
         .nil => try io.writeAll("nil\n"),
     }

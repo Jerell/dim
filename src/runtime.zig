@@ -5,7 +5,7 @@ const Format = @import("format.zig");
 pub const DisplayQuantity = struct {
     value: f64, // canonical
     dim: Dimension,
-    unit: []const u8, // preferred display unit symbol
+    unit: []const u8, // preferred display unit symbol (owned string)
     mode: Format.FormatMode = .none,
     is_delta: bool = false,
 
@@ -43,11 +43,10 @@ pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}
 
 pub fn mulDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
     const new_dim = Dimension.add(a.dim, b.dim);
-    // For now, leave unit blank; pretty-printing can normalize later when needed
     return DisplayQuantity{
         .value = a.value * b.value,
         .dim = new_dim,
-        .unit = "",
+        .unit = a.unit, // preserve left's unit symbol for display
         .mode = .none,
         .is_delta = false,
     };
@@ -58,7 +57,7 @@ pub fn divDisplay(a: DisplayQuantity, b: DisplayQuantity) DisplayQuantity {
     return DisplayQuantity{
         .value = a.value / b.value,
         .dim = new_dim,
-        .unit = "",
+        .unit = a.unit,
         .mode = .none,
         .is_delta = false,
     };

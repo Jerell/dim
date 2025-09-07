@@ -4,48 +4,41 @@ pub const Io = struct {
     // stdout
     out_buf: [4096]u8 = undefined,
     out_fw: std.fs.File.Writer,
-    out: *std.Io.Writer,
 
     // stderr
     err_buf: [2048]u8 = undefined,
     err_fw: std.fs.File.Writer,
-    err: *std.Io.Writer,
 
     // stdin
     in_buf: [4096]u8 = undefined,
     in_fr: std.fs.File.Reader,
-    inp: *std.Io.Reader,
 
     pub fn init() Io {
-        var self: Io = undefined;
-
-        self.out_fw = std.fs.File.stdout().writer(&self.out_buf);
-        self.out = &self.out_fw.interface;
-
-        self.err_fw = std.fs.File.stderr().writer(&self.err_buf);
-        self.err = &self.err_fw.interface;
-
-        self.in_fr = std.fs.File.stdin().reader(&self.in_buf);
-        self.inp = &self.in_fr.interface;
-
+        const self: Io = undefined;
         return self;
+    }
+
+    pub fn setup(self: *Io) void {
+        self.out_fw = std.fs.File.stdout().writer(&self.out_buf);
+        self.err_fw = std.fs.File.stderr().writer(&self.err_buf);
+        self.in_fr = std.fs.File.stdin().reader(&self.in_buf);
     }
 
     // stdout helpers
     pub fn printf(self: *Io, comptime fmt: []const u8, args: anytype) !void {
         // Callers must pass a tuple: .{...}
-        try self.out.print(fmt, args);
+        try self.writer().print(fmt, args);
     }
     pub fn writeAll(self: *Io, bytes: []const u8) !void {
-        try self.out.writeAll(bytes);
+        try self.writer().writeAll(bytes);
     }
 
     // stderr helpers
     pub fn eprintf(self: *Io, comptime fmt: []const u8, args: anytype) !void {
-        try self.err.print(fmt, args);
+        try self.errWriter().print(fmt, args);
     }
     pub fn ewriteAll(self: *Io, bytes: []const u8) !void {
-        try self.err.writeAll(bytes);
+        try self.errWriter().writeAll(bytes);
     }
 
     // stdin helpers
@@ -61,7 +54,7 @@ pub const Io = struct {
         // Read bytes one by one until newline or limit
         var read_count: usize = 0;
         while (read_count < limit) {
-            const byte = self.inp.*.takeByte() catch |err| switch (err) {
+            const byte = self.reader().*.takeByte() catch |err| switch (err) {
                 error.EndOfStream => break,
                 else => return err,
             };
@@ -78,17 +71,17 @@ pub const Io = struct {
     }
 
     pub fn flushAll(self: *Io) !void {
-        try self.out.flush();
-        try self.err.flush();
+        try self.writer().flush();
+        try self.errWriter().flush();
     }
 
     pub fn writer(self: *Io) *std.Io.Writer {
-        return self.out;
+        return &self.out_fw.interface;
     }
     pub fn errWriter(self: *Io) *std.Io.Writer {
-        return self.err;
+        return &self.err_fw.interface;
     }
     pub fn reader(self: *Io) *std.Io.Reader {
-        return self.inp;
+        return &self.in_fr.interface;
     }
 };

@@ -15,13 +15,67 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len > 2) {
-        try io.eprintf("Usage: dim [script]\n", .{});
-        std.process.exit(64);
-    } else if (args.len == 2) {
-        try runFile(&io, allocator, args[1]);
-    } else {
-        try runPrompt(&io, allocator);
+    if (args.len == 1) {
+        // No args: if stdin is a TTY, start REPL; otherwise, read from stdin once
+        if (std.posix.isatty(std.posix.STDIN_FILENO)) {
+            try runPrompt(&io, allocator);
+        } else {
+            try runStdin(&io, allocator);
+        }
+        return;
+    }
+
+    // With args: support
+    // - dim "<expr>"
+    // - dim --file|-f <path>
+    // - dim -            (read from stdin)
+    // - dim --help|-h
+    const arg1 = args[1];
+    if (std.mem.eql(u8, arg1, "--help") or std.mem.eql(u8, arg1, "-h")) {
+        try io.writeAll(
+            "Usage:\n" ++ "  dim                 Start REPL (or read from stdin if piped)\n" ++ "  dim \"<expr>\"       Evaluate a single expression\n" ++ "  dim --file <path>   Evaluate each line in file\n" ++ "  dim -               Read expressions from stdin (one per line)\n",
+        );
+        return;
+    }
+
+    if (std.mem.eql(u8, arg1, "-")) {
+        try runStdin(&io, allocator);
+        return;
+    }
+
+    if (std.mem.eql(u8, arg1, "--file") or std.mem.eql(u8, arg1, "-f")) {
+        if (args.len != 3) {
+            try io.eprintf("Error: --file requires a path.\n", .{});
+            try io.writeAll(
+                "Usage:\n" ++ "  dim                 Start REPL (or read from stdin if piped)\n" ++ "  dim \"<expr>\"       Evaluate a single expression\n" ++ "  dim --file <path>   Evaluate each line in file\n" ++ "  dim -               Read expressions from stdin (one per line)\n",
+            );
+            std.process.exit(64);
+        }
+        try runFile(&io, allocator, args[2]);
+        return;
+    }
+
+    if (args.len == 2) {
+        // Treat the sole arg as an expression to evaluate
+        try run(&io, allocator, arg1);
+        return;
+    }
+
+    // Anything else -> usage error
+    try io.eprintf("Invalid arguments. Use --help.\n", .{});
+    std.process.exit(64);
+}
+
+fn runStdin(io: *Io, allocator: std.mem.Allocator) !void {
+    const stdin_file = std.fs.File.stdin();
+    const bytes = try stdin_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+    defer allocator.free(bytes);
+
+    var it = std.mem.tokenizeAny(u8, bytes, "\r\n");
+    while (it.next()) |line| {
+        const trimmed = std.mem.trim(u8, line, " \t\r");
+        if (trimmed.len == 0) continue;
+        try run(io, allocator, trimmed);
     }
 }
 

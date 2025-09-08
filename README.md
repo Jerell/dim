@@ -37,12 +37,13 @@ $ dim "1 bar as kPa"
   - Extensible: add your own units, aliases, and prefixes at `comptime`.
 
 - **CLI (`dim` tool)**
-  - Parse expressions like `10 celsius + 20 fahrenheit in kelvin`.
+  - Parse expressions like `10 C + 20 F as K`.
   - Support arithmetic (`+`, `-`, `*`, `/`).
   - Support derived units (`m/s`, `N`, `J`).
-  - `in <unit>` to force output in a specific unit.
+  - `as <unit-or-constant>` to force output in a specific unit or user-defined constant; supports compound expressions after `as` (e.g., `kg/d`).
   - REPL mode for interactive calculations.
   - Configurable formatting (`:scientific`, `:engineering`, `:auto`, `:none`).
+  - Runtime constants: define with `name = (Expr)`. Constants behave like units and take precedence over registries. Commands: `list`, `show <name>`, `clear <name>`, `clear all`.
 
 ---
 
@@ -109,6 +110,27 @@ $ dim --file test.dim
 $ dim
 > 1 m + 2 m
 3.000 m
+
+# Define and use constants
+$ dim "d = (24 h)"
+24.000 h
+
+$ dim "1e6 s as d"
+11.574 d
+
+# Use constants in compound unit displays
+$ dim "d = (24 h) 200 kg/h as kg/d"
+4800.000 kg/d
+
+# Introspection and management
+$ dim "list"
+# prints each constant name, dimension, and expansion
+
+$ dim "show d"
+# prints: d: dim Time, 1 d = 86400.000 s (example)
+
+$ dim "clear d"
+ok
 ```
 
 ---
@@ -125,34 +147,6 @@ $ dim
 
 MIT — see [LICENSE](./LICENSE) for details.
 
-## Plan
+## Notes
 
-Add a runtime constants registry so users can define symbols that behave like units.
-
-- Syntax (parentheses required to delimit the value):
-
-  - `name = (Expr)`
-  - Example: `d = (24 h)`
-  - Example with expression: `d = (12 h + 12 h)`
-
-- Semantics:
-
-  - No type annotation in declarations; the dimension is inferred from the expression and stored with the constant.
-  - Constants are defined in terms of base units; cycles are not possible.
-  - Naming collisions are acceptable; constants take precedence over unit registries during lookup and formatting selection.
-
-- Usage:
-
-  - Constants can be used anywhere a unit symbol can be used.
-  - Formatting/conversion precedence for `as` (or equivalent): try constants first, then fall back to configured unit registries (SI/CGS/Imperial, etc.).
-  - Example: `d = (24 h) 1e6 s as d` displays one million seconds in days.
-
-- REPL/CLI commands:
-  - `list` — list all defined constants.
-  - `show <name>` — show the constant’s base-unit expansion and dimension.
-  - `clear <name>` — remove a specific constant.
-  - `clear all` — remove all constants.
-
-Notes:
-
-- Parentheses are important to give an unambiguous end to the value in declarations.
+- Parentheses are required in constant declarations to clearly delimit the value expression: `name = (Expr)`.

@@ -113,24 +113,14 @@ $ dim
 
 # Define and use constants
 $ dim "d = (24 h)"
-24.000 h
+86400.000 s
 
-$ dim "1e6 s as d"
+$ dim "1000000 s as d"
 11.574 d
 
 # Use constants in compound unit displays
 $ dim "d = (24 h) 200 kg/h as kg/d"
 4800.000 kg/d
-
-# Introspection and management
-$ dim "list"
-# prints each constant name, dimension, and expansion
-
-$ dim "show d"
-# prints: d: dim Time, 1 d = 86400.000 s (example)
-
-$ dim "clear d"
-ok
 ```
 
 ---

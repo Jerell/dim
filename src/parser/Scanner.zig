@@ -187,6 +187,10 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "and", TokenType.And },
     .{ "or", TokenType.Or },
     .{ "as", TokenType.As },
+    .{ "list", TokenType.List },
+    .{ "show", TokenType.Show },
+    .{ "clear", TokenType.Clear },
+    .{ "all", TokenType.All },
 });
 
 fn identifierType(text: []const u8) TokenType {

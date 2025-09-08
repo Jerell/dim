@@ -317,6 +317,26 @@ pub const Display = struct {
     }
 };
 
+pub const Assignment = struct {
+    name: []const u8,
+    value: *Expr, // expected to be a grouping containing a unit expression
+
+    pub fn print(self: Assignment, writer: *std.Io.Writer) !void {
+        try writer.print("(assign {s} ", .{self.name});
+        try self.value.print(writer);
+        try writer.print(")", .{});
+    }
+
+    pub fn evaluate(self: *Assignment, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
+        const val = try self.value.evaluate(allocator);
+        if (val != .display_quantity) return RuntimeError.InvalidOperand;
+        // Define constant in runtime registry; returns void on success
+        try dim.defineConstant(self.name, val.display_quantity);
+        // Evaluate to the right-hand value to support chaining semantics
+        return val;
+    }
+};
+
 pub const UnitExpr = struct {
     name: []const u8, // e.g. "m", "s"
     exponent: i32 = 1,
@@ -451,6 +471,7 @@ pub const Expr = union(enum) {
     display: Display,
     compound_unit: CompoundUnit,
     unit_expr: UnitExpr,
+    assignment: Assignment,
 
     pub fn toUnitString(self: *Expr, allocator: std.mem.Allocator) ![]u8 {
         return switch (self.*) {
@@ -473,6 +494,7 @@ pub const Expr = union(enum) {
             .display => |*display| return display.evaluate(allocator),
             .compound_unit => |*cu| return cu.evaluate(allocator),
             .unit_expr => |*ue| return ue.evaluate(allocator),
+            .assignment => |*asgn| return asgn.evaluate(allocator),
         }
     }
 
@@ -486,6 +508,7 @@ pub const Expr = union(enum) {
             .display => |display| return display.print(writer),
             .compound_unit => |cu| return cu.print(writer),
             .unit_expr => |ue| return ue.print(writer),
+            .assignment => |a| return a.print(writer),
         }
     }
 };

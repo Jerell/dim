@@ -124,3 +124,35 @@ $ dim
 ## 📜 License
 
 MIT — see [LICENSE](./LICENSE) for details.
+
+## Plan
+
+Add a runtime constants registry so users can define symbols that behave like units.
+
+- Syntax (parentheses required to delimit the value):
+
+  - `name = (Expr)`
+  - Example: `d = (24 h)`
+  - Example with expression: `d = (12 h + 12 h)`
+
+- Semantics:
+
+  - No type annotation in declarations; the dimension is inferred from the expression and stored with the constant.
+  - Constants are defined in terms of base units; cycles are not possible.
+  - Naming collisions are acceptable; constants take precedence over unit registries during lookup and formatting selection.
+
+- Usage:
+
+  - Constants can be used anywhere a unit symbol can be used.
+  - Formatting/conversion precedence for `as` (or equivalent): try constants first, then fall back to configured unit registries (SI/CGS/Imperial, etc.).
+  - Example: `d = (24 h) 1e6 s as d` displays one million seconds in days.
+
+- REPL/CLI commands:
+  - `list` — list all defined constants.
+  - `show <name>` — show the constant’s base-unit expansion and dimension.
+  - `clear <name>` — remove a specific constant.
+  - `clear all` — remove all constants.
+
+Notes:
+
+- Parentheses are important to give an unambiguous end to the value in declarations.

@@ -4,6 +4,11 @@ pub const TokenType = enum {
     Comma,
     // units
     Identifier,
+    // commands
+    List,
+    Show,
+    Clear,
+    All,
 
     //operations
     Plus,

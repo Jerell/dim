@@ -109,9 +109,52 @@ fn runPrompt(io: *Io, allocator: std.mem.Allocator) !void {
 }
 
 fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
+    const trimmed = std.mem.trim(u8, source, " \t\r\n");
+    if (trimmed.len == 0) return;
+
+    // Commands will be handled after scanning using tokens
+
     // 1. Scan
-    var scanner = try Scanner.init(allocator, io, source);
+    var scanner = try Scanner.init(allocator, io, trimmed);
     const tokens = try scanner.scanTokens();
+
+    // Handle commands using tokens (post-tokenization)
+    if (tokens.len >= 1 and tokens[0].type == .List) {
+        const count = dim.constantsCount();
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            if (dim.constantByIndex(i)) |entry| {
+                const fallback = entry.name;
+                const unit_str = try dim.Format.normalizeUnitString(allocator, entry.unit.dim, fallback, dim.Registries.si);
+                defer allocator.free(unit_str);
+                try io.printf("{s}: dim {any}, 1 {s} = {d:.6} {s}\n", .{ entry.name, entry.unit.dim, entry.name, entry.unit.scale, unit_str });
+            }
+        }
+        return;
+    }
+    if (tokens.len >= 2 and tokens[0].type == .Show and tokens[1].type == .Identifier) {
+        const name = tokens[1].lexeme;
+        if (dim.getConstant(name)) |u| {
+            const unit_str = try dim.Format.normalizeUnitString(allocator, u.dim, name, dim.Registries.si);
+            defer allocator.free(unit_str);
+            try io.printf("{s}: dim {any}, 1 {s} = {d:.6} {s}\n", .{ name, u.dim, name, u.scale, unit_str });
+        } else {
+            try io.eprintf("Unknown constant '{s}'\n", .{name});
+        }
+        return;
+    }
+    if (tokens.len >= 2 and tokens[0].type == .Clear and tokens[1].type == .All) {
+        dim.clearAllConstants();
+        try io.writeAll("ok\n");
+        return;
+    }
+    if (tokens.len >= 2 and tokens[0].type == .Clear and tokens[1].type == .Identifier) {
+        dim.clearConstant(tokens[1].lexeme);
+        try io.writeAll("ok\n");
+        return;
+    }
+
+    // No special-case parsing for constant declarations; handled by parser as assignment
 
     // 2. Parse
     var parser = Parser.init(allocator, tokens, io);
@@ -147,4 +190,39 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         .nil => try io.writeAll("nil\n"),
     }
     try io.flushAll();
+
+    // 5. Trailing expression on the same line after an assignment
+    // If the original source has more after the parsed assignment, we already consumed tokens.
+    // A simple way: if the first parsed expr was an assignment and there are unconsumed tokens before Eof, parse the rest.
+    // This is optional and no-op for non-assignment inputs.
+    if (tokens.len > parser.current + 1) {
+        const remaining = tokens[parser.current..tokens.len];
+        // Skip Eof-only remainder
+        if (!(remaining.len == 1 and remaining[0].type == .Eof)) {
+            var trail_parser = Parser.init(allocator, remaining, io);
+            const maybe_expr2 = trail_parser.parse();
+            if (maybe_expr2) |expr2| {
+                const res2 = expr2.evaluate(allocator) catch |err| {
+                    try io.eprintf("Runtime error: {any}\n", .{err});
+                    return;
+                };
+                switch (res2) {
+                    .number => |n| try io.printf("{d}\n", .{n}),
+                    .string => |s| try io.printf("{s}\n", .{s}),
+                    .boolean => |b| try io.printf("{}\n", .{b}),
+                    .display_quantity => |dq| {
+                        if (dim.findUnitAll(dq.unit)) |u| {
+                            try dim.Format.formatQuantityAsUnit(io.writer(), dq, u, dq.mode);
+                            try io.writeAll("\n");
+                        } else {
+                            try dq.format(io.writer());
+                            try io.writeAll("\n");
+                        }
+                    },
+                    .nil => try io.writeAll("nil\n"),
+                }
+                try io.flushAll();
+            }
+        }
+    }
 }

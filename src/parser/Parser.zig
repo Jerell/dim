@@ -71,6 +71,32 @@ pub const Parser = struct {
     }
 
     fn expression(self: *Parser) ParseError!*ast_expr.Expr {
+        // Lookahead for assignment pattern: Identifier '=' '('
+        if (!self.isAtEnd()) {
+            const curr_tok = self.peek();
+            if (curr_tok.type == TokenType.Identifier and (self.current + 2) < self.tokens.len) {
+                const t1 = self.tokens[self.current + 1];
+                const t2 = self.tokens[self.current + 2];
+                if (t1.type == TokenType.Equal and t2.type == TokenType.LParen) {
+                    // Consume identifier and '=' and '(' then parse inner expression and ')'
+                    const name_tok = self.advance(); // Identifier
+                    _ = self.advance(); // '='
+                    _ = self.advance(); // '('
+
+                    const inner = try self.expression();
+                    _ = try self.consume(TokenType.RParen, "Expect ')' after constant value");
+
+                    const grp_ptr = try self.allocator.create(ast_expr.Expr);
+                    grp_ptr.* = ast_expr.Expr{ .grouping = ast_expr.Grouping{ .expression = inner } };
+
+                    const node_ptr = try self.allocator.create(ast_expr.Expr);
+                    node_ptr.* = ast_expr.Expr{
+                        .assignment = ast_expr.Assignment{ .name = name_tok.lexeme, .value = grp_ptr },
+                    };
+                    return node_ptr;
+                }
+            }
+        }
         return self.comparison();
     }
 
@@ -103,7 +129,7 @@ pub const Parser = struct {
     }
 
     fn term(self: *Parser) ParseError!*ast_expr.Expr {
-        var expr_ptr = try self.factor();
+        var expr_ptr = try self.assignment();
 
         while (self.match(&.{ TokenType.Plus, TokenType.Minus })) {
             const op = self.previous();
@@ -119,6 +145,33 @@ pub const Parser = struct {
             };
             expr_ptr = node_ptr;
         }
+        return expr_ptr;
+    }
+
+    fn assignment(self: *Parser) ParseError!*ast_expr.Expr {
+        const expr_ptr = try self.factor();
+
+        // Handle '=' with a left identifier and right grouping '(...)'
+        if (self.match(&.{TokenType.Equal})) {
+            // Left must be a bare identifier; we only support const assignment
+            const left_tok = self.previousAt(1) catch return error.UnexpectedToken;
+            if (left_tok.type != TokenType.Identifier) return error.UnexpectedToken;
+
+            // Right must be a grouping expression in parentheses
+            if (!self.match(&.{TokenType.LParen})) return error.ExpectedToken;
+            const inner = try self.expression();
+            _ = try self.consume(TokenType.RParen, "Expect ')' after constant value");
+
+            const grp_ptr = try self.allocator.create(ast_expr.Expr);
+            grp_ptr.* = ast_expr.Expr{ .grouping = ast_expr.Grouping{ .expression = inner } };
+
+            const node_ptr = try self.allocator.create(ast_expr.Expr);
+            node_ptr.* = ast_expr.Expr{
+                .assignment = ast_expr.Assignment{ .name = left_tok.lexeme, .value = grp_ptr },
+            };
+            return node_ptr;
+        }
+
         return expr_ptr;
     }
 
@@ -292,6 +345,11 @@ pub const Parser = struct {
     fn advance(self: *Parser) Token {
         if (!self.isAtEnd()) self.current += 1;
         return self.previous();
+    }
+
+    fn previousAt(self: *const Parser, back: usize) ParseError!Token {
+        if (self.current < back) return error.UnexpectedToken;
+        return self.tokens[self.current - back];
     }
 
     fn isAtEnd(self: *const Parser) bool {

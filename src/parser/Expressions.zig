@@ -305,7 +305,8 @@ pub const Display = struct {
             return RuntimeError.InvalidOperands;
         }
 
-        // Convert canonical value to requested unit by dividing by target factor
+        // Convert canonical value to the requested unit by dividing by target factor.
+        // Printing will use the stored value directly with the chosen unit symbol and mode.
         const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{target.unit});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = dq.value / target.value,

@@ -172,33 +172,13 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         return;
     };
 
-    // 4. Print
-    switch (result) {
-        .number => |n| try io.printf("{d}\n", .{n}),
-        .string => |s| try io.printf("{s}\n", .{s}),
-        .boolean => |b| try io.printf("{}\n", .{b}),
-        .display_quantity => |dq| {
-            if (dim.findUnitAll(dq.unit)) |u| {
-                try dim.Format.formatQuantityAsUnit(io.writer(), dq, u, dq.mode);
-                try io.writeAll("\n");
-            } else {
-                // Fallback: use DisplayQuantity.format to respect mode
-                try dq.format(io.writer());
-                try io.writeAll("\n");
-            }
-        },
-        .nil => try io.writeAll("nil\n"),
-    }
-    try io.flushAll();
-
-    // 5. Trailing expression on the same line after an assignment
-    // If the original source has more after the parsed assignment, we already consumed tokens.
-    // A simple way: if the first parsed expr was an assignment and there are unconsumed tokens before Eof, parse the rest.
-    // This is optional and no-op for non-assignment inputs.
+    // 4/5. If there is a trailing expression after the first parse (common with assignment + expr),
+    // skip printing the first result and only print the trailing result. Otherwise, print the first result.
+    var has_trailing = false;
     if (tokens.len > parser.current + 1) {
         const remaining = tokens[parser.current..tokens.len];
-        // Skip Eof-only remainder
-        if (!(remaining.len == 1 and remaining[0].type == .Eof)) {
+        has_trailing = !(remaining.len == 1 and remaining[0].type == .Eof);
+        if (has_trailing) {
             var trail_parser = Parser.init(allocator, remaining, io);
             const maybe_expr2 = trail_parser.parse();
             if (maybe_expr2) |expr2| {
@@ -211,18 +191,28 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
                     .string => |s| try io.printf("{s}\n", .{s}),
                     .boolean => |b| try io.printf("{}\n", .{b}),
                     .display_quantity => |dq| {
-                        if (dim.findUnitAll(dq.unit)) |u| {
-                            try dim.Format.formatQuantityAsUnit(io.writer(), dq, u, dq.mode);
-                            try io.writeAll("\n");
-                        } else {
-                            try dq.format(io.writer());
-                            try io.writeAll("\n");
-                        }
+                        try dq.format(io.writer());
+                        try io.writeAll("\n");
                     },
                     .nil => try io.writeAll("nil\n"),
                 }
                 try io.flushAll();
+                return;
             }
         }
+    }
+
+    if (!has_trailing) {
+        switch (result) {
+            .number => |n| try io.printf("{d}\n", .{n}),
+            .string => |s| try io.printf("{s}\n", .{s}),
+            .boolean => |b| try io.printf("{}\n", .{b}),
+            .display_quantity => |dq| {
+                try dq.format(io.writer());
+                try io.writeAll("\n");
+            },
+            .nil => try io.writeAll("nil\n"),
+        }
+        try io.flushAll();
     }
 }

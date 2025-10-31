@@ -48,4 +48,23 @@ pub fn build(b: *std.Build) void {
         .root_module = mod,
     });
     b.installArtifact(lib);
+
+    // WebAssembly wrapper (exports JS-callable API)
+    if (target.result.cpu.arch == .wasm32) {
+        const wasm_exe = b.addExecutable(.{
+            .name = "dim_wasm",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/wasm.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "dim", .module = mod },
+                },
+            }),
+        });
+        // No start symbol for WASM; export all symbols to make JS interop easy
+        wasm_exe.entry = .disabled;
+        wasm_exe.rdynamic = true;
+        b.installArtifact(wasm_exe);
+    }
 }

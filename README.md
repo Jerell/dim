@@ -125,6 +125,130 @@ $ dim "d = (24 h) 200 kg/h as kg/d"
 
 ---
 
+## 🌐 Browser (WebAssembly) usage
+
+You can compile the library to a WASM module and call it from JavaScript in the browser. The WASM wrapper exposes a small C-ABI for evaluating expressions and managing runtime constants.
+
+### Build
+
+```bash
+zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall
+# => zig-out/bin/dim_wasm.wasm
+```
+
+### Exports
+
+- `dim_eval(input_ptr, input_len, out_ptr_ptr, out_len_ptr) -> i32` (0 = ok)
+- `dim_define(name_ptr, name_len, expr_ptr, expr_len) -> i32` (0 = ok)
+- `dim_clear(name_ptr, name_len) -> void`
+- `dim_clear_all() -> void`
+- `dim_alloc(n) -> u8*` (returns module-owned memory)
+- `dim_free(ptr, len) -> void` (free memory allocated by the module)
+
+`dim_eval` returns an owned UTF-8 string; you must free it with `dim_free`.
+
+### Browser example (WASI polyfill)
+
+Below is a minimal example using `@wasmer/wasi` for WASI bindings in the browser:
+
+```js
+import { init, WASI } from "@wasmer/wasi";
+import browserBindings from "@wasmer/wasi/lib/bindings/browser";
+
+// 1) Load WASI runtime (required) and instantiate the module
+await init();
+const wasi = new WASI({ bindings: browserBindings });
+
+const moduleBytes = fetch("zig-out/bin/dim_wasm.wasm");
+const module = await WebAssembly.compileStreaming(moduleBytes);
+const instance = await wasi.instantiate(module, {});
+wasi.start(instance);
+
+const { memory, dim_alloc, dim_free, dim_eval, dim_define } = instance.exports;
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function writeUtf8(str) {
+  const bytes = enc.encode(str);
+  const ptr = dim_alloc(bytes.length);
+  new Uint8Array(memory.buffer, ptr, bytes.length).set(bytes);
+  return { ptr, len: bytes.length };
+}
+
+function readBytes(ptr, len) {
+  return new Uint8Array(memory.buffer, ptr, len);
+}
+
+async function evalDim(expr) {
+  const { ptr: inPtr, len: inLen } = writeUtf8(expr);
+  const scratch = dim_alloc(8 /* out_ptr */ + 8 /* out_len */);
+
+  // In wasm32-wasi, usize is 4 bytes. We'll treat out slots as 4 + 4.
+  const outPtrPtr = scratch;
+  const outLenPtr = scratch + 4;
+
+  const rc = dim_eval(inPtr, inLen, outPtrPtr, outLenPtr);
+  dim_free(inPtr, inLen);
+  if (rc !== 0) {
+    dim_free(scratch, 8);
+    throw new Error("dim_eval failed");
+  }
+
+  const dv = new DataView(memory.buffer);
+  const outPtr = dv.getUint32(outPtrPtr, true);
+  const outLen = dv.getUint32(outLenPtr, true);
+  dim_free(scratch, 8);
+
+  const outBytes = readBytes(outPtr, outLen);
+  const outStr = dec.decode(outBytes);
+  dim_free(outPtr, outLen);
+  return outStr;
+}
+
+async function defineConst(name, expr) {
+  const n = writeUtf8(name);
+  const v = writeUtf8(expr);
+  const rc = dim_define(n.ptr, n.len, v.ptr, v.len);
+  dim_free(n.ptr, n.len);
+  dim_free(v.ptr, v.len);
+  if (rc !== 0) throw new Error("dim_define failed");
+}
+
+// Examples
+console.log(await evalDim("1 m"));
+console.log(await evalDim("2 m * 3 m"));
+await defineConst("c", "299792458 m/s");
+console.log(await evalDim("c as m/s"));
+```
+
+Notes:
+
+- Returned strings are module-owned; always free them with `dim_free(ptr, len)`.
+- `dim_define(name, value_expr)` lets you create constants usable in expressions (e.g. `d = (24 h)` is equivalent to calling `dim_define("d", "24 h")`).
+- The expression grammar is the same as the CLI (supports `as`, compound units, arithmetic, and formatting modes like `:engineering`).
+
+### Minimal loader (no WASI required)
+
+The exported functions do not depend on WASI. You can instantiate with an empty import object:
+
+```js
+// Browser
+const mod = await WebAssembly.compileStreaming(
+  fetch("zig-out/bin/dim_wasm.wasm")
+);
+const { exports } = await WebAssembly.instantiate(mod, {});
+
+// Node
+import { readFile } from "node:fs/promises";
+const bytes = await readFile("zig-out/bin/dim_wasm.wasm");
+const mod = await WebAssembly.compile(bytes);
+const { exports } = await WebAssembly.instantiate(mod, {});
+
+// exports contains: memory, dim_eval, dim_define, dim_clear, dim_clear_all, dim_alloc, dim_free
+```
+
+---
+
 ## 📖 Inspiration
 
 - [Rust `uom`](https://crates.io/crates/uom) — type-safe zero-cost units of measure.

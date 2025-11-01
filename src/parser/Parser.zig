@@ -232,15 +232,15 @@ pub const Parser = struct {
     }
 
     fn primary(self: *Parser) ParseError!*ast_expr.Expr {
-        // Support bare identifiers as implicit unit quantities (equivalent to `1 <unit_expr>`)
-        if (self.check(TokenType.Identifier)) {
-            const unit_expr = try self.parseUnitExpr();
-            const one_ptr = try self.allocator.create(ast_expr.Expr);
-            one_ptr.* = ast_expr.Expr{ .literal = ast_expr.Literal{ .value = ast_expr.LiteralValue{ .number = 1.0 } } };
-            const unit_node = try self.allocator.create(ast_expr.Expr);
-            unit_node.* = ast_expr.Expr{ .unit = ast_expr.Unit{ .value = one_ptr, .unit_expr = unit_expr } };
-            return unit_node;
-        }
+        // // Support bare identifiers as implicit unit quantities (equivalent to `1 <unit_expr>`)
+        // if (self.check(TokenType.Identifier)) {
+        //     const unit_expr = try self.parseUnitExpr();
+        //     const one_ptr = try self.allocator.create(ast_expr.Expr);
+        //     one_ptr.* = ast_expr.Expr{ .literal = ast_expr.Literal{ .value = ast_expr.LiteralValue{ .number = 1.0 } } };
+        //     const unit_node = try self.allocator.create(ast_expr.Expr);
+        //     unit_node.* = ast_expr.Expr{ .unit = ast_expr.Unit{ .value = one_ptr, .unit_expr = unit_expr } };
+        //     return unit_node;
+        // }
 
         if (self.match(&.{TokenType.Number})) {
             const lit = self.previous().literal.?;

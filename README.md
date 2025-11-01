@@ -15,7 +15,7 @@ $ dim "1 bar as Pa:scientific"
 1.000e5 Pa
 
 $ dim "1 bar as kPa"
-100.000 kPa
+100 kPa
 
 ```
 
@@ -98,10 +98,10 @@ Examples:
 
 ```bash
 $ dim "1 m + 2 m"
-3.000 m
+3 m
 
 $ printf "1 m + 2 m\n2 m in km\n" | dim
-3.000 m
+3 m
 0.002 km
 
 $ dim --file test.dim
@@ -109,18 +109,18 @@ $ dim --file test.dim
 
 $ dim
 > 1 m + 2 m
-3.000 m
+3 m
 
 # Define and use constants
 $ dim "d = (24 h)"
-86400.000 s
+86400 s
 
 $ dim "1000000 s as d"
 11.574 d
 
 # Use constants in compound unit displays
 $ dim "d = (24 h) 200 kg/h as kg/d"
-4800.000 kg/d
+4800 kg/d
 ```
 
 ---

@@ -32,7 +32,8 @@ fn evalToOwnedString(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
         .display_quantity => |dq| {
             const delta_prefix: []const u8 = if (dq.is_delta) "Δ" else "";
             switch (dq.mode) {
-                .none, .auto => try w.print("{s}{d:.3} {s}", .{ delta_prefix, dq.value, dq.unit }),
+                .none => try w.print("{s}{d} {s}", .{ delta_prefix, dq.value, dq.unit }),
+                .auto => try w.print("{s}{d:.3} {s}", .{ delta_prefix, dq.value, dq.unit }),
                 .scientific => try w.print("{s}{e:.3} {s}", .{ delta_prefix, dq.value, dq.unit }),
                 .engineering => {
                     if (dq.value == 0.0) {

@@ -13,7 +13,8 @@ pub const DisplayQuantity = struct {
     pub fn format(self: DisplayQuantity, writer: *std.Io.Writer) !void {
         const delta_prefix: []const u8 = if (self.is_delta) "Δ" else "";
         switch (self.mode) {
-            .none, .auto => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, self.value, self.unit }),
+            .none => try writer.print("{s}{d} {s}", .{ delta_prefix, self.value, self.unit }),
+            .auto => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, self.value, self.unit }),
             .scientific => try writer.print("{s}{e:.3} {s}", .{ delta_prefix, self.value, self.unit }),
             .engineering => {
                 if (self.value == 0.0) {

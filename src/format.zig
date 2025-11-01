@@ -35,7 +35,7 @@ pub fn formatQuantity(
 
     // 2. Format according to mode
     switch (mode) {
-        .none => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, val, u.symbol }),
+        .none => try writer.print("{s}{d} {s}", .{ delta_prefix, val, u.symbol }),
         .scientific => try writer.print("{s}{e:.3} {s}", .{ delta_prefix, val, u.symbol }),
         .engineering => {
             if (val == 0.0) {
@@ -84,7 +84,7 @@ pub fn formatQuantityAsUnit(
     const delta_prefix: []const u8 = if (q.is_delta) "Δ" else "";
 
     switch (mode) {
-        .none => try writer.print("{s}{d:.3} {s}", .{ delta_prefix, val, display_unit.symbol }),
+        .none => try writer.print("{s}{d} {s}", .{ delta_prefix, val, display_unit.symbol }),
         .scientific => try writer.print("{s}{e:.3} {s}", .{ delta_prefix, val, display_unit.symbol }),
         .engineering => {
             if (val == 0.0) {

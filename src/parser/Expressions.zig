@@ -177,17 +177,19 @@ pub const Binary = struct {
                 // Right must be a number; base can be number or display_quantity
                 if (right != .number) return RuntimeError.InvalidOperands;
                 const exp = right.number;
-                // Only allow integer exponents for quantities (dimension math)
-                const exp_int: i32 = @intFromFloat(exp);
-                if (@as(f64, @floatFromInt(exp_int)) != exp) {
-                    if (left == .display_quantity) return RuntimeError.InvalidOperands;
-                }
 
                 if (left == .number) {
                     return .{ .number = std.math.pow(f64, left.number, exp) };
                 }
                 if (left == .display_quantity) {
-                    const dq = try rt.powDisplay(allocator, left.display_quantity, exp_int);
+                    // Try integer exponent fast-path
+                    const exp_int: i32 = @intFromFloat(exp);
+                    if (@as(f64, @floatFromInt(exp_int)) == exp) {
+                        const dq_int = try rt.powDisplay(allocator, left.display_quantity, exp_int);
+                        return .{ .display_quantity = dq_int };
+                    }
+                    // Fallback to fractional exponent; will error if dimensions don't reduce to integers
+                    const dq = try rt.powDisplayFloat(allocator, left.display_quantity, exp);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;

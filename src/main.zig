@@ -218,7 +218,7 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
     }
 }
 
-test "special cases: fractional exponents currently error" {
+test "fractional exponent on squared quantity works (sqrt area -> length)" {
     var io = Io.init();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
 
@@ -237,8 +237,14 @@ test "special cases: fractional exponents currently error" {
     try std.testing.expect(maybe_expr != null);
 
     const expr = maybe_expr.?;
-    const eval_result = expr.evaluate(allocator);
+    const eval_result = try expr.evaluate(allocator);
 
-    // Current behavior: fractional exponent on a quantity is unsupported
-    try std.testing.expectError(Expressions.RuntimeError.InvalidOperands, eval_result);
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(4.0, dq.value, 1e-9);
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Length));
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "m"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
 }

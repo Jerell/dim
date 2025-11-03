@@ -23,6 +23,27 @@ fn isTemperatureDim(comptime D: Dimension) bool {
     return D.L == 0 and D.M == 0 and D.T == 0 and D.I == 0 and D.Th == 1 and D.N == 0 and D.J == 0;
 }
 
+fn powDimFloat(comptime D: Dimension, comptime exp: f64) Dimension {
+    const eps: f64 = 1e-9;
+    const to_i32 = struct {
+        fn call(x: f64) i32 {
+            const r = @round(x);
+            if (@abs(x - r) > eps) @compileError("quantity.pow: fractional exponent produces non-integer dimension exponents");
+            return @as(i32, @intFromFloat(r));
+        }
+    }.call;
+
+    const new_L = to_i32(@as(f64, @floatFromInt(D.L)) * exp);
+    const new_M = to_i32(@as(f64, @floatFromInt(D.M)) * exp);
+    const new_T = to_i32(@as(f64, @floatFromInt(D.T)) * exp);
+    const new_I = to_i32(@as(f64, @floatFromInt(D.I)) * exp);
+    const new_Th = to_i32(@as(f64, @floatFromInt(D.Th)) * exp);
+    const new_N = to_i32(@as(f64, @floatFromInt(D.N)) * exp);
+    const new_J = to_i32(@as(f64, @floatFromInt(D.J)) * exp);
+
+    return Dimension.init(new_L, new_M, new_T, new_I, new_Th, new_N, new_J);
+}
+
 pub fn Quantity(comptime Dim: Dimension) type {
     return struct {
         pub const dim: Dimension = Dim;
@@ -144,6 +165,37 @@ pub fn Quantity(comptime Dim: Dimension) type {
 
         pub fn unscale(self: Quantity(Dim), k: f64) Quantity(Dim) {
             return .{ .value = self.value / k };
+        }
+
+        /// Raise this quantity to a compile-time exponent. Supports integer and
+        /// floating exponents. For floating exponents, the resulting dimension
+        /// exponents must be integers (e.g., (L^2)^0.5 -> L).
+        pub fn pow(self: Quantity(Dim), comptime exponent: anytype) Quantity(blk: {
+            const TI = @typeInfo(@TypeOf(exponent));
+            switch (TI) {
+                .Int, .ComptimeInt => {
+                    const e: i32 = @as(i32, @intCast(exponent));
+                    break :blk Dimension.pow(Dim, e);
+                },
+                .Float, .ComptimeFloat => {
+                    const e: f64 = @as(f64, exponent);
+                    break :blk powDimFloat(Dim, e);
+                },
+                else => @compileError("Quantity.pow: exponent must be int or float and known at comptime"),
+            }
+        }) {
+            const TI = @typeInfo(@TypeOf(exponent));
+            switch (TI) {
+                .Int, .ComptimeInt => {
+                    const e: i32 = @as(i32, @intCast(exponent));
+                    return .{ .value = std.math.pow(f64, self.value, @as(f64, @floatFromInt(e))), .is_delta = false };
+                },
+                .Float, .ComptimeFloat => {
+                    const e: f64 = @as(f64, exponent);
+                    return .{ .value = std.math.pow(f64, self.value, e), .is_delta = false };
+                },
+                else => unreachable,
+            }
         }
     };
 }

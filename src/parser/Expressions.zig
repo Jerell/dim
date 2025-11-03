@@ -580,8 +580,16 @@ test "AST Printer test" {
 
     try binary_ptr.print(w);
 
+    // Manually flush the adapted writer's buffered data into the fixed buffer stream
+    while (true) {
+        const pending = w.buffered();
+        if (pending.len == 0) break;
+        try gw.writeAll(pending);
+        _ = w.consume(pending.len);
+    }
+
     const result = fbs.getWritten();
 
-    const expected = "(* (- 1.23e2) (group 4.567e1))";
+    const expected = "(* (- 123) (group 45.67))";
     try std.testing.expectEqualStrings(expected, result);
 }

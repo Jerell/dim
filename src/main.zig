@@ -3,6 +3,7 @@ const dim = @import("dim");
 const Io = @import("./Io.zig").Io;
 const Scanner = @import("parser/Scanner.zig").Scanner;
 const Parser = @import("parser/Parser.zig").Parser;
+const Expressions = @import("parser/Expressions.zig");
 
 pub fn main() !void {
     var io = Io.init();
@@ -215,4 +216,29 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         }
         try io.flushAll();
     }
+}
+
+test "special cases: fractional exponents currently error" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "(16 m^2)^0.5";
+
+    // Scan and parse
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = expr.evaluate(allocator);
+
+    // Current behavior: fractional exponent on a quantity is unsupported
+    try std.testing.expectError(Expressions.RuntimeError.InvalidOperands, eval_result);
 }

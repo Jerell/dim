@@ -2,6 +2,7 @@ const std = @import("std");
 const TokenType = @import("TokenType.zig").TokenType;
 const Token = @import("Token.zig").Token;
 const dim = @import("dim");
+const Io = @import("../Io.zig").Io;
 const DisplayQuantity = dim.DisplayQuantity;
 const rt = dim;
 const findUnitAllDynamic = dim.findUnitAllDynamic;
@@ -29,11 +30,11 @@ pub const LiteralValue = union(enum) {
 pub const Literal = struct {
     value: LiteralValue,
 
-    pub fn print(self: Literal, writer: *std.Io.Writer) !void {
+    pub fn print(self: Literal, writer: *std.Io.Writer) anyerror!void {
         switch (self.value) {
             .number => |n| try writer.print("{}", .{n}),
             .string => |s| try writer.print("\"{s}\"", .{s}),
-            .boolean => |b| try writer.print("{s}", .{b}),
+            .boolean => |b| try writer.print("{}", .{b}),
             .display_quantity => |dq| try dq.format(writer),
             .nil => try writer.print("nil", .{}),
         }
@@ -51,7 +52,7 @@ pub const Literal = struct {
 pub const Grouping = struct {
     expression: *Expr,
 
-    pub fn print(self: Grouping, writer: *std.Io.Writer) !void {
+    pub fn print(self: Grouping, writer: *std.Io.Writer) anyerror!void {
         try writer.print("(group ", .{});
         try self.expression.print(writer);
         try writer.print(")", .{});
@@ -69,7 +70,7 @@ pub const Unary = struct {
     operator: Token,
     right: *Expr,
 
-    pub fn print(self: Unary, writer: *std.Io.Writer) !void {
+    pub fn print(self: Unary, writer: *std.Io.Writer) anyerror!void {
         try writer.print("({s} ", .{self.operator.lexeme});
         try self.right.print(writer);
         try writer.print(")", .{});
@@ -107,7 +108,7 @@ pub const Binary = struct {
     operator: Token,
     right: *Expr,
 
-    pub fn print(self: Binary, writer: *std.Io.Writer) !void {
+    pub fn print(self: Binary, writer: *std.Io.Writer) anyerror!void {
         try writer.print("({s} ", .{self.operator.lexeme});
         try self.left.print(writer);
         try writer.print(" ", .{});
@@ -230,7 +231,7 @@ pub const Unit = struct {
     value: *Expr, // the numeric expression (usually a Literal)
     unit_expr: *Expr, // the unit expression (e.g., UnitExpr or CompoundUnit)
 
-    pub fn print(self: Unit, writer: *std.Io.Writer) !void {
+    pub fn print(self: Unit, writer: *std.Io.Writer) anyerror!void {
         try writer.print("(unit ", .{});
         try self.value.print(writer);
         try writer.print(" ", .{});
@@ -275,7 +276,7 @@ pub const Display = struct {
     unit_expr: *Expr, // unit expression after 'as' (supports *, /, ^)
     mode: ?Format.FormatMode = null, // optional
 
-    pub fn print(self: Display, writer: *std.Io.Writer) !void {
+    pub fn print(self: Display, writer: *std.Io.Writer) anyerror!void {
         try writer.print("(display ", .{});
         try self.expr.print(writer);
         try writer.print(" as ", .{});
@@ -398,7 +399,7 @@ pub const CompoundUnit = struct {
     op: Token, // Star or Slash
     right: *Expr,
 
-    pub fn print(self: CompoundUnit, writer: *std.Io.Writer) !void {
+    pub fn print(self: CompoundUnit, writer: *std.Io.Writer) anyerror!void {
         try self.left.print(writer);
         try writer.print(" {s} ", .{self.op.lexeme});
         try self.right.print(writer);
@@ -499,7 +500,7 @@ pub const Expr = union(enum) {
         }
     }
 
-    pub fn print(self: Expr, writer: *std.Io.Writer) !void {
+    pub fn print(self: Expr, writer: *std.Io.Writer) anyerror!void {
         switch (self) {
             .binary => |binary| return binary.print(writer),
             .unary => |unary| return unary.print(writer),
@@ -529,9 +530,9 @@ fn isEqual(left: LiteralValue, right: LiteralValue) bool {
 }
 
 test "AST Printer test" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     // Build: (* (- 123) (group 45.67))
     const literal123_ptr = try allocator.create(Expr);
@@ -542,7 +543,7 @@ test "AST Printer test" {
     const unary_ptr = try allocator.create(Expr);
     unary_ptr.* = Expr{
         .unary = Unary{
-            .operator = Token.init(TokenType.MINUS, "-", null, 1),
+            .operator = Token.init(TokenType.Minus, "-", null, 1),
             .right = literal123_ptr,
         },
     };
@@ -561,7 +562,7 @@ test "AST Printer test" {
     binary_ptr.* = Expr{
         .binary = Binary{
             .left = unary_ptr,
-            .operator = Token.init(TokenType.STAR, "*", null, 1),
+            .operator = Token.init(TokenType.Star, "*", null, 1),
             .right = grouping_ptr,
         },
     };
@@ -569,15 +570,17 @@ test "AST Printer test" {
     // defer binary_ptr.deinit(allocator);
     defer allocator.destroy(binary_ptr);
 
-    // New: use AllocatingWriter instead of fixedBufferStream
-    var aw = std.io.FixedBufferAllocator.init(allocator);
-    defer aw.deinit();
-    const w = &aw.writer();
+    // Use fixedBufferStream but adapt its GenericWriter to *std.Io.Writer
+    var out_buf: [256]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&out_buf);
+    var gw = fbs.writer();
+    var bridge_buf: [32]u8 = undefined;
+    var adapter = gw.adaptToNewApi(&bridge_buf);
+    const w: *std.Io.Writer = &adapter.new_interface;
 
     try binary_ptr.print(w);
 
-    const result = try aw.writtenOwned(); // owned by allocator
-    defer allocator.free(result);
+    const result = fbs.getWritten();
 
     const expected = "(* (- 1.23e2) (group 4.567e1))";
     try std.testing.expectEqualStrings(expected, result);

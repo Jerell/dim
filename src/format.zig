@@ -107,14 +107,7 @@ pub fn normalizeUnitString(
     fallback: []const u8,
     reg: UnitRegistry,
 ) ![]u8 {
-    // 1) Prefer aliases that match the full dimension
-    for (reg.aliases) |alias| {
-        if (Dimension.eql(alias.target.dim, dim)) {
-            return try std.fmt.allocPrint(allocator, "{s}", .{alias.symbol});
-        }
-    }
-
-    // 2) Prefer a registry unit that matches the full dimension (e.g., m/s, m/s², N)
+    // 1) Prefer a registry unit that matches the full dimension (e.g., m/s, m/s², N)
     // Prefer canonical symbols (scale == 1.0). If none, still fall back to the first match.
     var any_match: ?[]const u8 = null;
     for (reg.units) |u| {
@@ -129,7 +122,7 @@ pub fn normalizeUnitString(
         return try std.fmt.allocPrint(allocator, "{s}", .{sym});
     }
 
-    // 3) Build a canonical SI expression from the dimension, with a simple greedy
+    // 2) Build a canonical SI expression from the dimension, with a simple greedy
     //    factoring of one derived unit (if it reduces complexity), then base units.
     var rem = dim;
 

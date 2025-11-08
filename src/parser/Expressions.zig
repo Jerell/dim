@@ -254,7 +254,24 @@ pub const Unit = struct {
         if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
         const unit_dq = unit_val.display_quantity;
 
-        // Multiply by unit conversion factor to get canonical value
+        // Determine canonical value:
+        // - For simple unit expressions (single unit, exponent 1), use the unit's affine-aware conversion.
+        // - Otherwise (compound units or exponents), treat as pure multiplicative factor.
+        var canonical_value: f64 = undefined;
+        switch (self.unit_expr.*) {
+            .unit_expr => |ue| {
+                if (ue.exponent == 1) {
+                    const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
+                    canonical_value = u.toCanonical(num);
+                } else {
+                    canonical_value = num * unit_dq.value;
+                }
+            },
+            else => {
+                canonical_value = num * unit_dq.value;
+            },
+        }
+
         const fallback = try self.unit_expr.toUnitString(allocator);
         defer allocator.free(fallback);
         const normalized_unit = try Format.normalizeUnitString(
@@ -264,7 +281,7 @@ pub const Unit = struct {
             SiRegistry,
         );
         return LiteralValue{ .display_quantity = DisplayQuantity{
-            .value = num * unit_dq.value,
+            .value = canonical_value,
             .dim = unit_dq.dim,
             .unit = normalized_unit,
             .mode = .none,
@@ -308,11 +325,28 @@ pub const Display = struct {
             return RuntimeError.InvalidOperands;
         }
 
-        // Convert canonical value to the requested unit by dividing by target factor.
+        // Convert canonical value to the requested unit.
+        // - For simple unit expressions (single unit, exponent 1), use the unit's affine-aware fromCanonical().
+        // - Otherwise, divide by multiplicative conversion factor.
+        var converted_value: f64 = undefined;
+        switch (self.unit_expr.*) {
+            .unit_expr => |ue| {
+                if (ue.exponent == 1) {
+                    const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
+                    converted_value = u.fromCanonical(dq.value);
+                } else {
+                    converted_value = dq.value / target.value;
+                }
+            },
+            else => {
+                converted_value = dq.value / target.value;
+            },
+        }
+
         // Printing will use the stored value directly with the chosen unit symbol and mode.
         const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{target.unit});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
-            .value = dq.value / target.value,
+            .value = converted_value,
             .dim = dq.dim,
             .unit = unit_copy,
             .mode = self.mode orelse .none,

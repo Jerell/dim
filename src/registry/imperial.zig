@@ -8,7 +8,7 @@ pub const mi = dim.Unit{ .dim = dim.DIM.Length, .scale = 1609.34, .symbol = "mi"
 pub const lb = dim.Unit{ .dim = dim.DIM.Mass, .scale = 0.453592, .symbol = "lb" };
 pub const oz = dim.Unit{ .dim = dim.DIM.Mass, .scale = 0.0283495, .symbol = "oz" };
 
-pub const F = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 5.0 / 9.0, .offset = 459.67 * 5.0 / 9.0, .symbol = "°F" };
+pub const F = dim.Unit{ .dim = dim.DIM.Temperature, .scale = 5.0 / 9.0, .offset = 459.67, .symbol = "°F" };
 
 pub const s = dim.Unit{ .dim = dim.DIM.Time, .scale = 1.0, .symbol = "s" };
 pub const min = dim.Unit{ .dim = dim.DIM.Time, .scale = 60.0, .symbol = "min" };

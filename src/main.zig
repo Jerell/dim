@@ -248,3 +248,34 @@ test "fractional exponent on squared quantity works (sqrt area -> length)" {
         else => std.debug.panic("expected display_quantity result", .{}),
     }
 }
+
+test "unit conversion" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "100 C as F";
+
+    // Scan and parse
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(212.0, dq.value, 1e-9);
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Temperature));
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "F"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}

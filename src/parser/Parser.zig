@@ -217,8 +217,43 @@ pub const Parser = struct {
     fn unary(self: *Parser) ParseError!*ast_expr.Expr {
         if (self.match(&.{ TokenType.Minus, TokenType.Bang })) {
             const op = self.previous();
-            const right = try self.unary();
+            // Special-case: "-<number> <unit_expr>" should bind the minus to the number
+            // before unit application, so parse it as Unit(value = -number, unit_expr).
+            if (op.type == TokenType.Minus) {
+                // Look ahead for Number followed by Identifier (start of unit expr)
+                const idx_num = self.current;
+                const idx_unit = idx_num + 1;
+                if (idx_num < self.tokens.len and self.tokens[idx_num].type == TokenType.Number and
+                    idx_unit < self.tokens.len and self.tokens[idx_unit].type == TokenType.Identifier)
+                {
+                    // Consume number
+                    _ = self.advance();
+                    const num_tok = self.previous();
+                    const lit = num_tok.literal.?;
+                    if (lit != .number) return error.ExpectedToken;
+                    const neg_val = -lit.number;
 
+                    // Build negative number literal
+                    const num_node = try self.allocator.create(ast_expr.Expr);
+                    num_node.* = ast_expr.Expr{
+                        .literal = ast_expr.Literal{ .value = ast_expr.LiteralValue{ .number = neg_val } },
+                    };
+
+                    // Parse the trailing unit expression
+                    const unit_expr = try self.parseUnitExpr();
+
+                    const unit_node = try self.allocator.create(ast_expr.Expr);
+                    unit_node.* = ast_expr.Expr{
+                        .unit = ast_expr.Unit{
+                            .value = num_node,
+                            .unit_expr = unit_expr,
+                        },
+                    };
+                    return unit_node;
+                }
+            }
+
+            const right = try self.unary();
             const node_ptr = try self.allocator.create(ast_expr.Expr);
             node_ptr.* = ast_expr.Expr{
                 .unary = ast_expr.Unary{

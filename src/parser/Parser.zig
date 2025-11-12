@@ -314,28 +314,26 @@ pub const Parser = struct {
     }
 
     fn parseUnitExpr(self: *Parser) ParseError!*ast_expr.Expr {
-        var expr_ptr = try self.parseUnitTerm();
+        var expr_ptr = try self.parseUnitFactor();
 
         // Only consume '*' or '/' as part of a unit expression if they are
-        // followed by another unit identifier. This avoids greedily swallowing
-        // numeric multiplication/division like "2 m * 3 m" or "1 m / 2 s".
+        // followed by another unit identifier or a grouped unit expression "(...)". This avoids
+        // greedily swallowing numeric multiplication/division like "2 m * 3 m" or "1 m / 2 s".
         while (true) {
             const is_mul = self.check(TokenType.Star);
             const is_div = self.check(TokenType.Slash);
-            const is_pow = self.check(TokenType.Caret);
-            if (!(is_mul or is_div or is_pow)) break;
+            if (!(is_mul or is_div)) break;
 
-            // Look ahead one token after the operator; if it's not an Identifier,
-            // stop parsing the unit expression here and let higher-precedence
-            // arithmetic handle the operator.
+            // Look ahead: require Identifier or '(' to continue the unit expression
             const after_op_index = self.current + 1;
             if (after_op_index >= self.tokens.len) break;
-            if (self.tokens[after_op_index].type != TokenType.Identifier) break;
+            const next_t = self.tokens[after_op_index].type;
+            if (!(next_t == TokenType.Identifier or next_t == TokenType.LParen)) break;
 
-            // Consume operator now that we know another unit term follows
+            // Consume operator and parse the next unit factor
             _ = self.advance();
             const op = self.previous();
-            const right = try self.parseUnitTerm();
+            const right = try self.parseUnitFactor();
 
             const node_ptr = try self.allocator.create(ast_expr.Expr);
             node_ptr.* = ast_expr.Expr{
@@ -370,6 +368,17 @@ pub const Parser = struct {
             },
         };
         return node_ptr;
+    }
+
+    fn parseUnitFactor(self: *Parser) ParseError!*ast_expr.Expr {
+        if (self.match(&.{TokenType.LParen})) {
+            // Parse a grouped unit expression and return it directly (no Grouping node),
+            // so unit string rendering remains consistent.
+            const inner = try self.parseUnitExpr();
+            _ = try self.consume(TokenType.RParen, "Expect ')' after unit group");
+            return inner;
+        }
+        return self.parseUnitTerm();
     }
 
     fn match(self: *Parser, types: []const TokenType) bool {

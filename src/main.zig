@@ -80,6 +80,142 @@ fn runStdin(io: *Io, allocator: std.mem.Allocator) !void {
     }
 }
 
+test "unicode middle dot as multiplication for numbers" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "2·3";
+
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+    switch (eval_result) {
+        .number => |n| try std.testing.expectApproxEqAbs(6.0, n, 1e-9),
+        else => std.debug.panic("expected numeric result", .{}),
+    }
+}
+
+test "unicode dot operator as multiplication for numbers" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "2⋅3";
+
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+    switch (eval_result) {
+        .number => |n| try std.testing.expectApproxEqAbs(6.0, n, 1e-9),
+        else => std.debug.panic("expected numeric result", .{}),
+    }
+}
+
+test "middle dot works inside unit expressions after 'as' (J/kg·K)" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // Dimension matches on both sides: Energy/(Mass*Temperature)
+    const line = "1 J/kg/K as J/(kg·K)";
+
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            // CompoundUnit.toString normalizes '*' regardless of input glyph
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "unit grouping parentheses inside 'as' (J/(kg·K))" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "1 J/kg/K as J/(kg·K)";
+
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "unit grouping parentheses in quantity literal (1 J/(kg·K))" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "1 J/(kg·K)";
+
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
 fn runFile(io: *Io, allocator: std.mem.Allocator, path: []const u8) !void {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();

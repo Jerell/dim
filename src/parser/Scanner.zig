@@ -42,6 +42,25 @@ pub const Scanner = struct {
 
     fn scanToken(self: *Scanner) !void {
         const c = self.advance();
+        // Handle common Unicode multiplication symbols by normalizing to '*'
+        // - U+00B7 MIDDLE DOT (UTF-8: C2 B7)
+        // - U+22C5 DOT OPERATOR (UTF-8: E2 8B 85)
+        // - U+00D7 MULTIPLICATION SIGN (UTF-8: C3 97)
+        if (c == 0xC2 and self.peek() == 0xB7) {
+            _ = self.advance(); // consume 0xB7
+            try self.addToken(TokenType.Star, null);
+            return;
+        }
+        if (c == 0xE2 and self.peek() == 0x8B and self.peekNext() == 0x85) {
+            self.current += 2; // consume 0x8B 0x85
+            try self.addToken(TokenType.Star, null);
+            return;
+        }
+        if (c == 0xC3 and self.peek() == 0x97) {
+            _ = self.advance(); // consume 0x97
+            try self.addToken(TokenType.Star, null);
+            return;
+        }
         switch (c) {
             '(' => try self.addToken(TokenType.LParen, null),
             ')' => try self.addToken(TokenType.RParen, null),

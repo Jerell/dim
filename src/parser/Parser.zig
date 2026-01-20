@@ -352,7 +352,15 @@ pub const Parser = struct {
     fn parseUnitTerm(self: *Parser) ParseError!*ast_expr.Expr {
         const id_tok = try self.consume(TokenType.Identifier, "Expected unit identifier");
         var exponent: i32 = 1;
+        var name = id_tok.lexeme;
 
+        // Check if identifier ends with a superscript character
+        if (extractSuperscriptFromIdentifier(id_tok.lexeme)) |result| {
+            name = result.name;
+            exponent = result.exponent;
+        }
+
+        // Also check for caret notation (takes precedence if both are present)
         if (self.match(&.{TokenType.Caret})) {
             const exp_tok = try self.consume(TokenType.Number, "Expected exponent after '^'");
             const lit = exp_tok.literal.?;
@@ -363,7 +371,7 @@ pub const Parser = struct {
         const node_ptr = try self.allocator.create(ast_expr.Expr);
         node_ptr.* = ast_expr.Expr{
             .unit_expr = ast_expr.UnitExpr{
-                .name = id_tok.lexeme,
+                .name = name,
                 .exponent = exponent,
             },
         };
@@ -443,4 +451,48 @@ pub fn reportTokenError(
         defer allocator.free(msg_prefix);
         io.eprintf("[line {}] Error{s}: {s}\n", .{ token.line, msg_prefix, message }) catch {};
     }
+}
+
+// Extract superscript exponent from identifier if present
+// Returns the base name and exponent, or null if no superscript found
+fn extractSuperscriptFromIdentifier(identifier: []const u8) ?struct { name: []const u8, exponent: i32 } {
+    if (identifier.len < 2) return null;
+
+    // Check for 2-byte superscripts: ¹ (0xC2 0xB9), ² (0xC2 0xB2), ³ (0xC2 0xB3)
+    if (identifier.len >= 2) {
+        const last_two = identifier[identifier.len - 2..];
+        if (last_two[0] == 0xC2) {
+            const exp: ?i32 = switch (last_two[1]) {
+                0xB9 => 1, // ¹
+                0xB2 => 2, // ²
+                0xB3 => 3, // ³
+                else => null,
+            };
+            if (exp) |e| {
+                return .{ .name = identifier[0..identifier.len - 2], .exponent = e };
+            }
+        }
+    }
+
+    // Check for 3-byte superscripts: ⁰ (0xE2 0x81 0xB0), ⁴-⁹ (0xE2 0x81 0xB4-0xB9)
+    if (identifier.len >= 3) {
+        const last_three = identifier[identifier.len - 3..];
+        if (last_three[0] == 0xE2 and last_three[1] == 0x81) {
+            const exp: ?i32 = switch (last_three[2]) {
+                0xB0 => 0, // ⁰
+                0xB4 => 4, // ⁴
+                0xB5 => 5, // ⁵
+                0xB6 => 6, // ⁶
+                0xB7 => 7, // ⁷
+                0xB8 => 8, // ⁸
+                0xB9 => 9, // ⁹
+                else => null,
+            };
+            if (exp) |e| {
+                return .{ .name = identifier[0..identifier.len - 3], .exponent = e };
+            }
+        }
+    }
+
+    return null;
 }

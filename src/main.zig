@@ -508,3 +508,35 @@ test "unit conversion -20 C to C" {
         else => std.debug.panic("expected display_quantity result", .{}),
     }
 }
+
+test "mixing superscript and caret notation (kg/m³ + kg/m^3)" {
+    var io = Io.init();
+    defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const line = "1 kg/m³ + 1 kg/m^3";
+
+    // Scan and parse
+    var scanner = try Scanner.init(allocator, &io, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, &io);
+    const maybe_expr = parser.parse();
+    try std.testing.expect(maybe_expr != null);
+
+    const expr = maybe_expr.?;
+    const eval_result = try expr.evaluate(allocator);
+
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(2.0, dq.value, 1e-9);
+            // Both should have the same dimension (density: M/L³)
+            try std.testing.expect(dq.dim.M == 1);
+            try std.testing.expect(dq.dim.L == -3);
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}

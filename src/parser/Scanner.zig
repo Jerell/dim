@@ -179,8 +179,49 @@ pub const Scanner = struct {
     }
 
     fn identifier(self: *Scanner) !void {
-        while (isAlphaNumeric(self.peek())) {
-            _ = self.advance();
+        while (true) {
+            const c = self.peek();
+            if (isAlphaNumeric(c)) {
+                _ = self.advance();
+            } else if (c == 0xC2) {
+                // Could be superscript (¹, ², ³) or middle dot (·)
+                // Check second byte to determine
+                if (self.current + 1 < self.source.len) {
+                    const second = self.source[self.current + 1];
+                    if (second == 0xB9 or second == 0xB2 or second == 0xB3) {
+                        // It's a superscript: ¹, ², or ³
+                        _ = self.advance(); // consume 0xC2
+                        _ = self.advance(); // consume second byte
+                    } else {
+                        // Not a superscript (could be middle dot 0xB7 or something else)
+                        // Stop scanning identifier so it can be handled as a separate token
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else if (c == 0xE2) {
+                // Could be superscript (⁰, ⁴-⁹) or dot operator (·)
+                // Check second and third bytes to determine
+                if (self.current + 2 < self.source.len) {
+                    const second = self.source[self.current + 1];
+                    const third = self.source[self.current + 2];
+                    if (second == 0x81 and (third == 0xB0 or (third >= 0xB4 and third <= 0xB9))) {
+                        // It's a superscript: ⁰ or ⁴-⁹
+                        _ = self.advance(); // consume 0xE2
+                        _ = self.advance(); // consume 0x81
+                        _ = self.advance(); // consume third byte
+                    } else {
+                        // Not a superscript (could be dot operator 0x8B 0x85 or something else)
+                        // Stop scanning identifier so it can be handled as a separate token
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
         }
 
         const text = self.source[self.start..self.current];
@@ -200,6 +241,17 @@ fn isAlpha(char: u8) bool {
 
 fn isAlphaNumeric(char: u8) bool {
     return isAlpha(char) or isDigit(char);
+}
+
+// Check if a byte is the start of a superscript character
+// Common superscripts: ⁰ (U+2070), ¹ (U+00B9), ² (U+00B2), ³ (U+00B3), ⁴-⁹ (U+2074-2079)
+fn isSuperscriptStart(char: u8) bool {
+    // ³ (U+00B3) is encoded as 0xC2 0xB3 in UTF-8
+    // ² (U+00B2) is encoded as 0xC2 0xB2 in UTF-8
+    // ¹ (U+00B9) is encoded as 0xC2 0xB9 in UTF-8
+    // ⁰ (U+2070) is encoded as 0xE2 0x81 0xB0 in UTF-8
+    // ⁴-⁹ (U+2074-2079) are encoded as 0xE2 0x81 0xB4-0xB9 in UTF-8
+    return char == 0xC2 or char == 0xE2;
 }
 
 const keywords = std.StaticStringMap(TokenType).initComptime(.{

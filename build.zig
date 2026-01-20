@@ -49,6 +49,21 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(lib);
 
+    // C-compatible static library (exports C-ABI functions for FFI)
+    const c_lib = b.addLibrary(.{
+        .name = "dim_c",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "dim", .module = mod },
+            },
+        }),
+    });
+    c_lib.linkLibC();
+    b.installArtifact(c_lib);
+
     // WebAssembly wrapper (exports JS-callable API)
     if (target.result.cpu.arch == .wasm32) {
         const wasm_exe = b.addExecutable(.{

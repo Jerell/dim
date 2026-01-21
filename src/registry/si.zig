@@ -10,6 +10,7 @@ pub const m3 = dim.Unit{ .dim = dim.DIM.Volume, .scale = 1.0, .symbol = "m³" };
 
 pub const g = dim.Unit{ .dim = dim.DIM.Mass, .scale = 0.001, .symbol = "g" };
 pub const kg = dim.Unit{ .dim = dim.DIM.Mass, .scale = 1.0, .symbol = "kg" };
+pub const t = dim.Unit{ .dim = dim.DIM.Mass, .scale = 1000.0, .symbol = "t" };
 
 pub const s = dim.Unit{ .dim = dim.DIM.Time, .scale = 1.0, .symbol = "s" };
 pub const min = dim.Unit{ .dim = dim.DIM.Time, .scale = 60.0, .symbol = "min" };
@@ -36,12 +37,13 @@ pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = 
 pub const kgps = dim.Unit{ .dim = dim.DIM.MassFlowRate, .scale = 1.0, .symbol = "kg/s" };
 
 pub const Units = [_]dim.Unit{
-    m,    km, cm, mm,
-    g,    kg, s,  min,
-    h,    A,  K,  C,
-    mol,  cd, Pa, bar,
-    J,    W,  N,  mps,
-    mps2, m2, m3, kgps,
+    m,    km,   cm, mm,
+    g,    kg,   t,  s,
+    min,  h,    A,  K,
+    C,    mol,  cd, Pa,
+    bar,  J,    W,  N,
+    mps,  mps2, m2, m3,
+    kgps,
 };
 
 const aliases = [_]dim.Alias{

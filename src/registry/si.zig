@@ -36,6 +36,8 @@ pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = 
 
 pub const kgps = dim.Unit{ .dim = dim.DIM.MassFlowRate, .scale = 1.0, .symbol = "kg/s" };
 
+pub const Cp = dim.Unit{ .dim = dim.DIM.SpecificHeatCapacity, .scale = 1.0, .symbol = "J/(kg·K)" };
+
 pub const Units = [_]dim.Unit{
     m,    km,   cm, mm,
     g,    kg,   t,  s,
@@ -43,7 +45,7 @@ pub const Units = [_]dim.Unit{
     C,    mol,  cd, Pa,
     bar,  J,    W,  N,
     mps,  mps2, m2, m3,
-    kgps,
+    kgps, Cp,
 };
 
 const aliases = [_]dim.Alias{

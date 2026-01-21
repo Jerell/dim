@@ -153,7 +153,7 @@ test "middle dot works inside unit expressions after 'as' (J/kg·K)" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
-            // CompoundUnit.toString normalizes '*' regardless of input glyph
+            // 'as' conversion preserves the target unit format
             try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -182,6 +182,7 @@ test "unit grouping parentheses inside 'as' (J/(kg·K))" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            // 'as' conversion preserves the target unit format
             try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -210,7 +211,8 @@ test "unit grouping parentheses in quantity literal (1 J/(kg·K))" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
-            try std.testing.expect(std.mem.eql(u8, dq.unit, "J/kg*K"));
+            // Specific heat capacity unit
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "J/(kg·K)"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
     }

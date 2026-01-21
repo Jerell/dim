@@ -165,6 +165,29 @@ pub fn normalizeUnitString(
         }
     }.call;
 
+    // Check if subtracting a derived unit creates an invalid remainder.
+    // The remainder should be "between" zero and the original for each component:
+    // - Same sign as original (or zero)
+    // - Magnitude not exceeding original
+    // This prevents picking units that cause sign flips or overshoot.
+    const isInvalidRemainder = struct {
+        fn checkComponent(orig: i32, r: i32) bool {
+            if (orig == 0) return r != 0; // can't introduce new dimensions
+            if (orig > 0) return r < 0 or r > orig; // must stay in [0, orig]
+            // orig < 0
+            return r > 0 or r < orig; // must stay in [orig, 0]
+        }
+        fn call(original: Dimension, remainder: Dimension) bool {
+            return checkComponent(original.L, remainder.L) or
+                checkComponent(original.M, remainder.M) or
+                checkComponent(original.T, remainder.T) or
+                checkComponent(original.I, remainder.I) or
+                checkComponent(original.Th, remainder.Th) or
+                checkComponent(original.N, remainder.N) or
+                checkComponent(original.J, remainder.J);
+        }
+    }.call;
+
     var picked: ?[]const u8 = null;
     var best_reduction: i32 = 0;
     var best_priority: i32 = 1000;
@@ -176,6 +199,13 @@ pub fn normalizeUnitString(
                 if (std.mem.eql(u8, sym, preferred_symbols[i])) return @as(i32, @intCast(i));
             }
             return 999;
+        }
+    }.call;
+
+    // Check if a dimension is dimensionless (all components zero)
+    const isDimensionless = struct {
+        fn call(d: Dimension) bool {
+            return d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0;
         }
     }.call;
 
@@ -194,6 +224,14 @@ pub fn normalizeUnitString(
         if (is_base) continue;
 
         const d_after = Dimension.sub(rem, d);
+
+        // Reject if this creates an invalid remainder (sign flip or overshoot)
+        if (isInvalidRemainder(rem, d_after)) continue;
+
+        // Only pick this derived unit if the remainder is dimensionless.
+        // This prevents ugly composites like "m/s*m²" for volumetric flow rate.
+        if (!isDimensionless(d_after)) continue;
+
         const reduction = curr_c - complexitySum(d_after);
         if (reduction <= 0) continue;
 
@@ -237,6 +275,40 @@ pub fn normalizeUnitString(
             wrote_any = true;
             handled_rem = true;
             break;
+        }
+    }
+
+    // Try to match the positive portion (numerator) to a compound unit like m³, m²
+    // This gives cleaner output like "m³/s" instead of "m^3/s"
+    if (!handled_rem) {
+        const pos_dim = Dimension.init(
+            if (rem.L > 0) rem.L else 0,
+            if (rem.M > 0) rem.M else 0,
+            if (rem.T > 0) rem.T else 0,
+            if (rem.I > 0) rem.I else 0,
+            if (rem.Th > 0) rem.Th else 0,
+            if (rem.N > 0) rem.N else 0,
+            if (rem.J > 0) rem.J else 0,
+        );
+        for (reg.units) |u| {
+            if (u.scale != 1.0) continue;
+            if (Dimension.eql(u.dim, pos_dim)) {
+                if (wrote_any) try w.writeAll("*");
+                try w.writeAll(u.symbol);
+                wrote_any = true;
+                // Update rem to only have negative components
+                rem = Dimension.init(
+                    if (rem.L < 0) rem.L else 0,
+                    if (rem.M < 0) rem.M else 0,
+                    if (rem.T < 0) rem.T else 0,
+                    if (rem.I < 0) rem.I else 0,
+                    if (rem.Th < 0) rem.Th else 0,
+                    if (rem.N < 0) rem.N else 0,
+                    if (rem.J < 0) rem.J else 0,
+                );
+                handled_rem = Dimension.eql(rem, Dimension.init(0, 0, 0, 0, 0, 0, 0));
+                break;
+            }
         }
     }
 

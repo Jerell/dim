@@ -79,4 +79,5 @@ pub const DIM = struct {
 
     pub const Viscosity = Dimension.init(-1, 1, -1, 0, 0, 0, 0); // M L^-1 T^-1
     pub const KinematicViscosity = Dimension.init(2, 0, -1, 0, 0, 0, 0); // L^2 T^-1
+    pub const MassFlowRate = Dimension.init(0, 1, -1, 0, 0, 0, 0); // M T^-1
 };

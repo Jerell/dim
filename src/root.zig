@@ -23,6 +23,7 @@ pub const Format = @import("format.zig");
 const _si = @import("registry/Si.zig");
 const _imperial = @import("registry/Imperial.zig");
 const _cgs = @import("registry/Cgs.zig");
+const _industrial = @import("registry/Industrial.zig");
 
 // Runtime constants registry (session-scoped)
 var _consts_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -107,21 +108,43 @@ pub fn constantByIndex(index: usize) ?struct { name: []const u8, unit: Unit } {
 pub fn findUnitAll(symbol: []const u8) ?Unit {
     // 0. Constants first
     if (getConstant(symbol)) |u_const| return u_const;
+
+    // 1. First pass: exact/alias matches only (prevents prefix greed across registries)
+    if (_si.Registry.findExact(symbol)) |u| return u;
+    if (_imperial.Registry.findExact(symbol)) |u| return u;
+    if (_cgs.Registry.findExact(symbol)) |u| return u;
+    if (_industrial.Registry.findExact(symbol)) |u| return u;
+
+    // 2. Second pass: with prefix expansion
     if (_si.Registry.find(symbol)) |u| return u;
     if (_imperial.Registry.find(symbol)) |u| return u;
     if (_cgs.Registry.find(symbol)) |u| return u;
+    if (_industrial.Registry.find(symbol)) |u| return u;
+
     return null;
 }
 
 /// Search across built-in registries + optional user-supplied registries
 pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const UnitRegistry) ?Unit {
-    // Search constants first, then built-in registries
+    // Search constants first
     if (getConstant(symbol)) |u| return u;
+
+    // 1. First pass: exact/alias matches only (prevents prefix greed across registries)
+    if (_si.Registry.findExact(symbol)) |u| return u;
+    if (_imperial.Registry.findExact(symbol)) |u| return u;
+    if (_cgs.Registry.findExact(symbol)) |u| return u;
+    if (_industrial.Registry.findExact(symbol)) |u| return u;
+    if (extra) |regs| {
+        for (regs) |reg| {
+            if (reg.findExact(symbol)) |u| return u;
+        }
+    }
+
+    // 2. Second pass: with prefix expansion
     if (_si.Registry.find(symbol)) |u| return u;
     if (_imperial.Registry.find(symbol)) |u| return u;
     if (_cgs.Registry.find(symbol)) |u| return u;
-
-    // Then search user-supplied registries if provided
+    if (_industrial.Registry.find(symbol)) |u| return u;
     if (extra) |regs| {
         for (regs) |reg| {
             if (reg.find(symbol)) |u| return u;
@@ -136,6 +159,7 @@ pub const Units = struct {
     pub const si = _si.Units;
     pub const imperial = _imperial.Units;
     pub const cgs = _cgs.Units;
+    pub const industrial = _industrial.Units;
 };
 
 /// Re-export full registries
@@ -143,6 +167,7 @@ pub const Registries = struct {
     pub const si = _si.Registry;
     pub const imperial = _imperial.Registry;
     pub const cgs = _cgs.Registry;
+    pub const industrial = _industrial.Registry;
 };
 
 test "basic dimensional arithmetic" {

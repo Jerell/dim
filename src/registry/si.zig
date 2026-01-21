@@ -33,13 +33,15 @@ pub const N = dim.Unit{ .dim = dim.DIM.Force, .scale = 1.0, .symbol = "N" };
 pub const mps = dim.Unit{ .dim = dim.DIM.Velocity, .scale = 1.0, .symbol = "m/s" };
 pub const mps2 = dim.Unit{ .dim = dim.DIM.Acceleration, .scale = 1.0, .symbol = "m/s²" };
 
+pub const kgps = dim.Unit{ .dim = dim.DIM.MassFlowRate, .scale = 1.0, .symbol = "kg/s" };
+
 pub const Units = [_]dim.Unit{
     m,    km, cm, mm,
     g,    kg, s,  min,
     h,    A,  K,  C,
     mol,  cd, Pa, bar,
     J,    W,  N,  mps,
-    mps2, m2, m3,
+    mps2, m2, m3, kgps,
 };
 
 const aliases = [_]dim.Alias{

@@ -41,7 +41,8 @@ pub const UnitRegistry = struct {
     aliases: []const Alias,
     prefixes: []const Prefix,
 
-    pub fn find(self: UnitRegistry, symbol: []const u8) ?Unit {
+    /// Find a unit by exact symbol or alias match only (no prefix expansion)
+    pub fn findExact(self: UnitRegistry, symbol: []const u8) ?Unit {
         // 1. Exact match
         for (self.units) |u| {
             if (std.mem.eql(u8, u.symbol, symbol)) return u;
@@ -50,7 +51,14 @@ pub const UnitRegistry = struct {
         for (self.aliases) |a| {
             if (std.mem.eql(u8, a.symbol, symbol)) return a.target.*;
         }
-        // 3. Prefix + base unit
+        return null;
+    }
+
+    /// Find a unit by symbol, alias, or prefix + base unit
+    pub fn find(self: UnitRegistry, symbol: []const u8) ?Unit {
+        // 1. Exact/alias match first
+        if (self.findExact(symbol)) |u| return u;
+        // 2. Prefix + base unit
         for (self.prefixes) |p| {
             if (std.mem.startsWith(u8, symbol, p.symbol)) {
                 const base = symbol[p.symbol.len..];

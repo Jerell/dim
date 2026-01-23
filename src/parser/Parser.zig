@@ -460,7 +460,7 @@ fn extractSuperscriptFromIdentifier(identifier: []const u8) ?struct { name: []co
 
     // Check for 2-byte superscripts: ¹ (0xC2 0xB9), ² (0xC2 0xB2), ³ (0xC2 0xB3)
     if (identifier.len >= 2) {
-        const last_two = identifier[identifier.len - 2..];
+        const last_two = identifier[identifier.len - 2 ..];
         if (last_two[0] == 0xC2) {
             const exp: ?i32 = switch (last_two[1]) {
                 0xB9 => 1, // ¹
@@ -469,14 +469,14 @@ fn extractSuperscriptFromIdentifier(identifier: []const u8) ?struct { name: []co
                 else => null,
             };
             if (exp) |e| {
-                return .{ .name = identifier[0..identifier.len - 2], .exponent = e };
+                return .{ .name = identifier[0 .. identifier.len - 2], .exponent = e };
             }
         }
     }
 
     // Check for 3-byte superscripts: ⁰ (0xE2 0x81 0xB0), ⁴-⁹ (0xE2 0x81 0xB4-0xB9)
     if (identifier.len >= 3) {
-        const last_three = identifier[identifier.len - 3..];
+        const last_three = identifier[identifier.len - 3 ..];
         if (last_three[0] == 0xE2 and last_three[1] == 0x81) {
             const exp: ?i32 = switch (last_three[2]) {
                 0xB0 => 0, // ⁰
@@ -489,7 +489,7 @@ fn extractSuperscriptFromIdentifier(identifier: []const u8) ?struct { name: []co
                 else => null,
             };
             if (exp) |e| {
-                return .{ .name = identifier[0..identifier.len - 3], .exponent = e };
+                return .{ .name = identifier[0 .. identifier.len - 3], .exponent = e };
             }
         }
     }

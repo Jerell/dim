@@ -2,7 +2,6 @@ const std = @import("std");
 const TokenType = @import("TokenType.zig").TokenType;
 const Token = @import("Token.zig").Token;
 const dim = @import("dim");
-const Io = @import("../Io.zig").Io;
 const DisplayQuantity = dim.DisplayQuantity;
 const rt = dim;
 const findUnitAllDynamic = dim.findUnitAllDynamic;

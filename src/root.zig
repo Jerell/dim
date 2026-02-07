@@ -1,5 +1,23 @@
 const std = @import("std");
 
+// Parser exports
+pub const Scanner = @import("parser/Scanner.zig").Scanner;
+pub const Parser = @import("parser/Parser.zig").Parser;
+pub const LiteralValue = @import("parser/Expressions.zig").LiteralValue;
+pub const Expr = @import("parser/Expressions.zig").Expr;
+pub const RuntimeError = @import("parser/Expressions.zig").RuntimeError;
+
+/// Evaluate a string expression. Returns null on parse/eval errors.
+/// Pass an error writer to receive error messages, or null to discard them.
+pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) ?LiteralValue {
+    var scanner = Scanner.init(allocator, err_writer, source) catch return null;
+    const tokens = scanner.scanTokens() catch return null;
+    var parser = Parser.init(allocator, tokens, err_writer);
+    const expr = parser.parse() orelse return null;
+    if (parser.hadError) return null;
+    return expr.evaluate(allocator) catch null;
+}
+
 pub const Dimension = @import("Dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
 pub const DIM = @import("Dimension.zig").DIM;

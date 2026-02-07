@@ -1,9 +1,8 @@
 const std = @import("std");
 const dim = @import("dim");
 const Io = @import("./Io.zig").Io;
-const Scanner = @import("parser/Scanner.zig").Scanner;
-const Parser = @import("parser/Parser.zig").Parser;
-const Expressions = @import("parser/Expressions.zig");
+const Scanner = dim.Scanner;
+const Parser = dim.Parser;
 
 pub fn main() !void {
     var io = Io.init();
@@ -90,10 +89,10 @@ test "unicode middle dot as multiplication for numbers" {
 
     const line = "2·3";
 
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -115,10 +114,10 @@ test "unicode dot operator as multiplication for numbers" {
 
     const line = "2⋅3";
 
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -141,10 +140,10 @@ test "middle dot works inside unit expressions after 'as' (J/kg·K)" {
     // Dimension matches on both sides: Energy/(Mass*Temperature)
     const line = "1 J/kg/K as J/(kg·K)";
 
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -170,10 +169,10 @@ test "unit grouping parentheses inside 'as' (J/(kg·K))" {
 
     const line = "1 J/kg/K as J/(kg·K)";
 
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -199,10 +198,10 @@ test "unit grouping parentheses in quantity literal (1 J/(kg·K))" {
 
     const line = "1 J/(kg·K)";
 
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -254,7 +253,7 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
     // Commands will be handled after scanning using tokens
 
     // 1. Scan
-    var scanner = try Scanner.init(allocator, io, trimmed);
+    var scanner = try Scanner.init(allocator, io.errWriter(), trimmed);
     const tokens = try scanner.scanTokens();
 
     // Handle commands using tokens (post-tokenization)
@@ -296,7 +295,7 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
     // No special-case parsing for constant declarations; handled by parser as assignment
 
     // 2. Parse
-    var parser = Parser.init(allocator, tokens, io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
 
     if (parser.hadError or maybe_expr == null) {
@@ -318,7 +317,7 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
         const remaining = tokens[parser.current..tokens.len];
         has_trailing = !(remaining.len == 1 and remaining[0].type == .Eof);
         if (has_trailing) {
-            var trail_parser = Parser.init(allocator, remaining, io);
+            var trail_parser = Parser.init(allocator, remaining, io.errWriter());
             const maybe_expr2 = trail_parser.parse();
             if (maybe_expr2) |expr2| {
                 const res2 = expr2.evaluate(allocator) catch |err| {
@@ -367,10 +366,10 @@ test "fractional exponent on squared quantity works (sqrt area -> length)" {
     const line = "(16 m^2)^0.5";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -398,10 +397,10 @@ test "unit conversion C to F" {
     const line = "100 C as F";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -429,10 +428,10 @@ test "unit conversion K to C" {
     const line = "100 K as C";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -460,10 +459,10 @@ test "unit conversion 10 C to C" {
     const line = "10 C as C";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -491,10 +490,10 @@ test "unit conversion -20 C to C" {
     const line = "-20 C as C";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 
@@ -522,10 +521,10 @@ test "mixing superscript and caret notation (kg/m³ + kg/m^3)" {
     const line = "1 kg/m³ + 1 kg/m^3";
 
     // Scan and parse
-    var scanner = try Scanner.init(allocator, &io, line);
+    var scanner = try Scanner.init(allocator, io.errWriter(), line);
     const tokens = try scanner.scanTokens();
 
-    var parser = Parser.init(allocator, tokens, &io);
+    var parser = Parser.init(allocator, tokens, io.errWriter());
     const maybe_expr = parser.parse();
     try std.testing.expect(maybe_expr != null);
 

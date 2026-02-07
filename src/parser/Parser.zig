@@ -5,7 +5,6 @@ const dim = @import("dim");
 const FormatMode = dim.Format.FormatMode;
 const ast_expr = @import("Expressions.zig");
 const errors = @import("errors.zig");
-const Io = @import("../Io.zig").Io;
 
 const ParseError = error{
     ExpectedToken,
@@ -19,18 +18,18 @@ pub const Parser = struct {
     current: usize,
     allocator: std.mem.Allocator,
     hadError: bool = false,
-    io: *Io,
+    err_writer: ?*std.Io.Writer,
 
     pub fn init(
         allocator: std.mem.Allocator,
         tokens: []const Token,
-        io: *Io,
+        err_writer: ?*std.Io.Writer,
     ) Parser {
         return Parser{
             .tokens = tokens,
             .current = 0,
             .allocator = allocator,
-            .io = io,
+            .err_writer = err_writer,
         };
     }
 
@@ -433,7 +432,7 @@ pub const Parser = struct {
 
     fn reportParseError(self: *Parser, token: Token, message: []const u8) ParseError {
         self.hadError = true;
-        reportTokenError(self.allocator, token, message, self.io);
+        reportTokenError(self.allocator, token, message, self.err_writer);
         return ParseError.ExpectedToken;
     }
 };
@@ -442,14 +441,15 @@ pub fn reportTokenError(
     allocator: std.mem.Allocator,
     token: Token,
     message: []const u8,
-    io: *Io,
+    err_writer: ?*std.Io.Writer,
 ) void {
+    const w = err_writer orelse return;
     if (token.type == .Eof) {
-        io.eprintf("[line {}] Error at end: {s}\n", .{ token.line, message }) catch {};
+        w.print("[line {}] Error at end: {s}\n", .{ token.line, message }) catch {};
     } else {
         const msg_prefix = std.fmt.allocPrint(allocator, " at '{s}'", .{token.lexeme}) catch " at token";
         defer allocator.free(msg_prefix);
-        io.eprintf("[line {}] Error{s}: {s}\n", .{ token.line, msg_prefix, message }) catch {};
+        w.print("[line {}] Error{s}: {s}\n", .{ token.line, msg_prefix, message }) catch {};
     }
 }
 

@@ -9,6 +9,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/root.zig"),
         .target = target,
     });
+    mod.addImport("dim", mod);
 
     // CLI executable
     const exe = b.addExecutable(.{

@@ -3,23 +3,22 @@ const Token = @import("Token.zig").Token;
 const TokenType = @import("TokenType.zig").TokenType;
 const LiteralValue = @import("Expressions.zig").LiteralValue;
 const errors = @import("errors.zig");
-const Io = @import("../Io.zig").Io;
 
 pub const Scanner = struct {
     source: []const u8,
     tokens: std.ArrayListUnmanaged(Token),
     allocator: std.mem.Allocator,
-    io: *Io,
+    err_writer: ?*std.Io.Writer,
     start: usize,
     current: usize,
     line: usize,
 
-    pub fn init(allocator: std.mem.Allocator, io: *Io, source: []const u8) !Scanner {
+    pub fn init(allocator: std.mem.Allocator, err_writer: ?*std.Io.Writer, source: []const u8) !Scanner {
         return .{
             .source = source,
             .tokens = .{},
             .allocator = allocator,
-            .io = io,
+            .err_writer = err_writer,
             .start = 0,
             .current = 0,
             .line = 1,
@@ -96,7 +95,7 @@ pub const Scanner = struct {
                 } else if (isAlpha(c)) {
                     try self.identifier();
                 } else {
-                    errors.reportError(self.io, self.line, "unexpected character");
+                    errors.reportError(self.err_writer, self.line, "unexpected character");
                 }
             },
         }
@@ -171,7 +170,7 @@ pub const Scanner = struct {
 
         const num_str = self.source[self.start..self.current];
         const value = std.fmt.parseFloat(f64, num_str) catch {
-            errors.reportError(self.io, self.line, "Invalid number format");
+            errors.reportError(self.err_writer, self.line, "Invalid number format");
             return;
         };
 

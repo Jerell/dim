@@ -9,13 +9,35 @@ pub const RuntimeError = @import("parser/Expressions.zig").RuntimeError;
 
 /// Evaluate a string expression. Returns null on parse/eval errors.
 /// Pass an error writer to receive error messages, or null to discard them.
+/// The returned LiteralValue (if .display_quantity) has its .unit string
+/// allocated with the provided allocator. All intermediate scanner/parser
+/// allocations are cleaned up automatically via an internal arena.
 pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) ?LiteralValue {
-    var scanner = Scanner.init(allocator, err_writer, source) catch return null;
+    // Use an arena for scanner tokens, parser AST nodes, and intermediate strings.
+    // Only the final result's owned strings are duped into the caller's allocator.
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+
+    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
     const tokens = scanner.scanTokens() catch return null;
-    var parser = Parser.init(allocator, tokens, err_writer);
+    var parser = Parser.init(arena_alloc, tokens, err_writer);
     const expr = parser.parse() orelse return null;
     if (parser.hadError) return null;
-    return expr.evaluate(allocator) catch null;
+    const result = expr.evaluate(arena_alloc) catch return null;
+
+    // Promote owned strings out of the arena into the caller's allocator
+    return switch (result) {
+        .display_quantity => |dq| LiteralValue{ .display_quantity = .{
+            .value = dq.value,
+            .dim = dq.dim,
+            .unit = allocator.dupe(u8, dq.unit) catch return null,
+            .mode = dq.mode,
+            .is_delta = dq.is_delta,
+        } },
+        .string => |s| LiteralValue{ .string = allocator.dupe(u8, s) catch return null },
+        else => result,
+    };
 }
 
 pub const Dimension = @import("Dimension.zig").Dimension;

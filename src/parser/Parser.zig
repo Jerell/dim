@@ -36,7 +36,9 @@ pub const Parser = struct {
     pub fn parse(self: *Parser) ?*ast_expr.Expr {
         const expr = self.conversion() catch |err| {
             self.hadError = true;
-            std.debug.print("Parse error: {any}\n", .{err});
+            if (self.err_writer) |w| {
+                w.print("Parse error: {any}\n", .{err}) catch {};
+            }
             return null;
         };
         return expr;

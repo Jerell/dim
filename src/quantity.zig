@@ -1,7 +1,7 @@
 const std = @import("std");
-const Dimension = @import("Dimension.zig").Dimension;
-const UnitRegistry = @import("Unit.zig").UnitRegistry;
-const Unit = @import("Unit.zig").Unit;
+const Dimension = @import("dimension.zig").Dimension;
+const UnitRegistry = @import("unit.zig").UnitRegistry;
+const Unit = @import("unit.zig").Unit;
 const Format = @import("format.zig");
 
 const QuantityError = error{

@@ -1,6 +1,6 @@
 const std = @import("std");
-const TokenType = @import("TokenType.zig").TokenType;
-const LiteralValue = @import("Expressions.zig").LiteralValue;
+const TokenType = @import("token_type.zig").TokenType;
+const LiteralValue = @import("expressions.zig").LiteralValue;
 
 pub const Token = struct {
     type: TokenType,

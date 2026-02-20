@@ -1,7 +1,7 @@
 const std = @import("std");
-const Dimension = @import("Dimension.zig").Dimension;
+const Dimension = @import("dimension.zig").Dimension;
 const Format = @import("format.zig");
-const SiRegistry = @import("registry/Si.zig").Registry;
+const SiRegistry = @import("registry/si.zig").Registry;
 
 pub const DisplayQuantity = struct {
     value: f64, // canonical

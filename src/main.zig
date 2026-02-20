@@ -1,6 +1,6 @@
 const std = @import("std");
 const dim = @import("dim");
-const Io = @import("./Io.zig").Io;
+const Io = @import("./io.zig").Io;
 const Scanner = dim.Scanner;
 const Parser = dim.Parser;
 

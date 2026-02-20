@@ -1,9 +1,9 @@
 const std = @import("std");
 const dim = @import("dim");
-const Io = @import("parser/../Io.zig").Io;
-const Scanner = @import("parser/Scanner.zig").Scanner;
-const Parser = @import("parser/Parser.zig").Parser;
-const Exprs = @import("parser/Expressions.zig");
+const Io = @import("parser/../io.zig").Io;
+const Scanner = @import("parser/scanner.zig").Scanner;
+const Parser = @import("parser/parser.zig").Parser;
+const Exprs = @import("parser/expressions.zig");
 
 fn evalToOwnedString(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
     var io = Io.init();

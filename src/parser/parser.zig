@@ -1,9 +1,9 @@
 const std = @import("std");
-const Token = @import("Token.zig").Token;
-const TokenType = @import("TokenType.zig").TokenType;
+const Token = @import("token.zig").Token;
+const TokenType = @import("token_type.zig").TokenType;
 const dim = @import("dim");
 const FormatMode = dim.Format.FormatMode;
-const ast_expr = @import("Expressions.zig");
+const ast_expr = @import("expressions.zig");
 const errors = @import("errors.zig");
 
 const ParseError = error{

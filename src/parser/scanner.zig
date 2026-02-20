@@ -1,7 +1,7 @@
 const std = @import("std");
-const Token = @import("Token.zig").Token;
-const TokenType = @import("TokenType.zig").TokenType;
-const LiteralValue = @import("Expressions.zig").LiteralValue;
+const Token = @import("token.zig").Token;
+const TokenType = @import("token_type.zig").TokenType;
+const LiteralValue = @import("expressions.zig").LiteralValue;
 const errors = @import("errors.zig");
 
 pub const Scanner = struct {

@@ -1,5 +1,5 @@
 const std = @import("std");
-const Dimension = @import("Dimension.zig").Dimension;
+const Dimension = @import("dimension.zig").Dimension;
 const Quantity = @import("quantity.zig").Quantity;
 const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
 

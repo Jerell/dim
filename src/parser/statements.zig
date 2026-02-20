@@ -2,8 +2,8 @@
 //! I don't plan to have variable assignment or a print keyword
 
 const std = @import("std");
-const ast_expr = @import("Expressions.zig");
-const Token = @import("Token.zig").Token;
+const ast_expr = @import("expressions.zig");
+const Token = @import("token.zig").Token;
 
 pub const Stmt = union(enum) {
     expression: ExpressionStmt,

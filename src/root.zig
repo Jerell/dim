@@ -1,11 +1,11 @@
 const std = @import("std");
 
 // Parser exports
-pub const Scanner = @import("parser/Scanner.zig").Scanner;
-pub const Parser = @import("parser/Parser.zig").Parser;
-pub const LiteralValue = @import("parser/Expressions.zig").LiteralValue;
-pub const Expr = @import("parser/Expressions.zig").Expr;
-pub const RuntimeError = @import("parser/Expressions.zig").RuntimeError;
+pub const Scanner = @import("parser/scanner.zig").Scanner;
+pub const Parser = @import("parser/parser.zig").Parser;
+pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
+pub const Expr = @import("parser/expressions.zig").Expr;
+pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;
 
 /// Evaluate a string expression. Returns null on parse/eval errors.
 /// Pass an error writer to receive error messages, or null to discard them.
@@ -40,13 +40,13 @@ pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*
     };
 }
 
-pub const Dimension = @import("Dimension.zig").Dimension;
+pub const Dimension = @import("dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
-pub const DIM = @import("Dimension.zig").DIM;
-pub const Unit = @import("Unit.zig").Unit;
-pub const Alias = @import("Unit.zig").Alias;
-pub const Prefix = @import("Unit.zig").Prefix;
-pub const UnitRegistry = @import("Unit.zig").UnitRegistry;
+pub const DIM = @import("dimension.zig").DIM;
+pub const Unit = @import("unit.zig").Unit;
+pub const Alias = @import("unit.zig").Alias;
+pub const Prefix = @import("unit.zig").Prefix;
+pub const UnitRegistry = @import("unit.zig").UnitRegistry;
 // Re-export runtime types and helpers
 pub const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
 pub const addDisplay = @import("runtime.zig").addDisplay;
@@ -63,7 +63,7 @@ pub const Format = @import("format.zig");
 const _si = @import("registry/si.zig");
 const _imperial = @import("registry/imperial.zig");
 const _cgs = @import("registry/cgs.zig");
-const _industrial = @import("registry/Industrial.zig");
+const _industrial = @import("registry/industrial.zig");
 
 // Runtime constants registry (session-scoped)
 var _consts_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);

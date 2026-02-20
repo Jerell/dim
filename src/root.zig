@@ -60,9 +60,9 @@ pub const powDisplayFloat = @import("runtime.zig").powDisplayFloat;
 // Re-export formatting API
 pub const Format = @import("format.zig");
 
-const _si = @import("registry/Si.zig");
-const _imperial = @import("registry/Imperial.zig");
-const _cgs = @import("registry/Cgs.zig");
+const _si = @import("registry/si.zig");
+const _imperial = @import("registry/imperial.zig");
+const _cgs = @import("registry/cgs.zig");
 const _industrial = @import("registry/Industrial.zig");
 
 // Runtime constants registry (session-scoped)

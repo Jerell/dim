@@ -25,6 +25,10 @@ pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*
     var parser = Parser.init(arena_alloc, tokens, err_writer);
     const expr = parser.parse() orelse return null;
     if (parser.hadError) return null;
+    if (tokens[parser.current].type != .Eof) {
+        reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
+        return null;
+    }
     const result = expr.evaluate(arena_alloc) catch return null;
 
     // Promote owned strings out of the arena into the caller's allocator

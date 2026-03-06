@@ -316,6 +316,10 @@ fn run(io: *Io, allocator: std.mem.Allocator, source: []const u8) !void {
     if (tokens.len > parser.current + 1) {
         const remaining = tokens[parser.current..tokens.len];
         has_trailing = !(remaining.len == 1 and remaining[0].type == .Eof);
+        if (has_trailing and expr.* != .assignment) {
+            dim.reportTokenError(allocator, tokens[parser.current], "Unexpected token", io.errWriter());
+            return;
+        }
         if (has_trailing) {
             var trail_parser = Parser.init(allocator, remaining, io.errWriter());
             const maybe_expr2 = trail_parser.parse();

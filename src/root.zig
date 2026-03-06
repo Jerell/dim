@@ -3,6 +3,7 @@ const std = @import("std");
 // Parser exports
 pub const Scanner = @import("parser/scanner.zig").Scanner;
 pub const Parser = @import("parser/parser.zig").Parser;
+pub const reportTokenError = @import("parser/parser.zig").reportTokenError;
 pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
 pub const Expr = @import("parser/expressions.zig").Expr;
 pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;

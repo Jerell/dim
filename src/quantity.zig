@@ -97,6 +97,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
             mode: Format.FormatMode,
 
             pub fn format(self: @This(), writer: anytype) !void {
+                if (!Dimension.eql(self.u.dim, Dim)) return error.DimensionMismatch;
                 try Format.formatQuantityAsUnit(writer, self.q, self.u, self.mode);
             }
         };

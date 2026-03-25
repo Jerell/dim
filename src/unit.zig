@@ -17,17 +17,7 @@ pub const Unit = struct {
         return v / self.scale - self.offset;
     }
 
-    pub fn from(self: Unit, v: f64) DisplayQuantity {
-        return DisplayQuantity{
-            .value = self.toCanonical(v),
-            .dim = self.dim,
-            .unit = self.symbol, // Use the unit's symbol as display unit
-            .mode = .none,
-            .is_delta = false,
-        };
-    }
-
-    pub fn quantity(comptime self: Unit, v: f64) Quantity(self.dim) {
+    pub fn from(comptime self: Unit, v: f64) Quantity(self.dim) {
         return .{ .value = self.toCanonical(v), .is_delta = false };
     }
 

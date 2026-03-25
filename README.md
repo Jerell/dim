@@ -69,8 +69,8 @@ pub fn main() !void {
     const t0 = Time.init(10.0);   // 10 s
 
     // quantities from comptime units (dimension checked at compile time)
-    const d1 = Si.km.quantity(100.0);    // 100 km
-    const t1 = Si.h.quantity(1.0);       // 1 hour
+    const d1 = Si.km.from(100.0);    // 100 km
+    const t1 = Si.h.from(1.0);       // 1 hour
     const d1b = Length.from(100.0, Si.km); // equivalent
 
     // quantities from runtime units (dimension checked at runtime)

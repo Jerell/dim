@@ -82,12 +82,10 @@ pub fn main() !void {
     const kmh = try km.div(h, "km/h");
     try io.printf("speed: {f}\n", .{v.AsUnit(kmh, .none)});
 
-    // search for a unit
-    const u = dim.findUnitAllDynamic("erg", null);
-    if (u) |val| {
-        try io.printf("{s}, dim {any}\n", .{ val.symbol, val.dim });
-    } else {
-        try io.printf("No unit\n", .{});
+    // evaluate string expressions
+    const allocator = std.heap.page_allocator;
+    if (dim.evaluate(allocator, "100 km/h as m/s", null)) |result| {
+        try io.printf("result: {f}\n", .{result.display_quantity});
     }
 }
 ```

@@ -44,6 +44,15 @@ pub const Unit = struct {
         };
     }
 
+    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.offset != 0.0) return error.AffineUnitCombination;
+        return .{
+            .dim = Dimension.pow(self.dim, exponent),
+            .scale = std.math.pow(f64, self.scale, @floatFromInt(exponent)),
+            .symbol = symbol,
+        };
+    }
+
     pub fn div(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
         if (self.offset != 0.0 or other.offset != 0.0) return error.AffineUnitCombination;
         return .{

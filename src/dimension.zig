@@ -53,7 +53,7 @@ pub const Dimension = struct {
     }
 };
 
-pub const DIM = struct {
+pub const Dimensions = struct {
     // Base dimensions
     pub const Dimensionless = Dimension.init(0, 0, 0, 0, 0, 0, 0);
     pub const Length = Dimension.init(1, 0, 0, 0, 0, 0, 0);

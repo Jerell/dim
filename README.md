@@ -61,8 +61,8 @@ pub fn main() !void {
     defer io.flushAll() catch |e| std.debug.print("flush error: {s}\n", .{@errorName(e)});
 
     const Si = dim.Units.si;
-    const Length = dim.Quantity(dim.DIM.Length);
-    const Time = dim.Quantity(dim.DIM.Time);
+    const Length = dim.Quantity(dim.Dimensions.Length);
+    const Time = dim.Quantity(dim.Dimensions.Time);
 
     // quantities in canonical SI units
     const d0 = Length.init(100.0); // 100 m

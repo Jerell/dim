@@ -383,7 +383,7 @@ test "fractional exponent on squared quantity works (sqrt area -> length)" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(4.0, dq.value, 1e-9);
-            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Length));
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Length));
             try std.testing.expect(std.mem.eql(u8, dq.unit, "m"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -414,7 +414,7 @@ test "unit conversion C to F" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(212.0, dq.value, 1e-9);
-            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Temperature));
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Temperature));
             try std.testing.expect(std.mem.eql(u8, dq.unit, "F"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -445,7 +445,7 @@ test "unit conversion K to C" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(-173.15, dq.value, 1e-9);
-            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Temperature));
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Temperature));
             try std.testing.expect(std.mem.eql(u8, dq.unit, "C"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -476,7 +476,7 @@ test "unit conversion 10 C to C" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(10.0, dq.value, 1e-9);
-            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Temperature));
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Temperature));
             try std.testing.expect(std.mem.eql(u8, dq.unit, "C"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
@@ -507,7 +507,7 @@ test "unit conversion -20 C to C" {
     switch (eval_result) {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(-20.0, dq.value, 1e-9);
-            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.DIM.Temperature));
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Temperature));
             try std.testing.expect(std.mem.eql(u8, dq.unit, "C"));
         },
         else => std.debug.panic("expected display_quantity result", .{}),

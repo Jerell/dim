@@ -47,7 +47,7 @@ pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*
 
 pub const Dimension = @import("dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
-pub const DIM = @import("dimension.zig").DIM;
+pub const Dimensions = @import("dimension.zig").Dimensions;
 pub const Unit = @import("unit.zig").Unit;
 pub const Alias = @import("unit.zig").Alias;
 pub const Prefix = @import("unit.zig").Prefix;
@@ -216,9 +216,9 @@ pub const Registries = struct {
 };
 
 test "basic dimensional arithmetic" {
-    const LengthQ = Quantity(DIM.Length);
-    const TimeQ = Quantity(DIM.Time);
-    const SpeedQ = Quantity(DIM.Velocity);
+    const LengthQ = Quantity(Dimensions.Length);
+    const TimeQ = Quantity(Dimensions.Time);
+    const SpeedQ = Quantity(Dimensions.Velocity);
 
     const d = LengthQ.init(100.0); // 100 m
     const t = TimeQ.init(10.0); // 10 s
@@ -232,9 +232,9 @@ test "basic dimensional arithmetic" {
 }
 
 test "force = mass * acceleration" {
-    const MassQ = Quantity(DIM.Mass);
-    const AccelQ = Quantity(DIM.Acceleration);
-    const ForceQ = Quantity(DIM.Force);
+    const MassQ = Quantity(Dimensions.Mass);
+    const AccelQ = Quantity(Dimensions.Acceleration);
+    const ForceQ = Quantity(Dimensions.Force);
 
     const m = MassQ.init(2.0); // 2 kg
     const a = AccelQ.init(9.81); // 9.81 m/s^2
@@ -249,7 +249,7 @@ test "force = mass * acceleration" {
 }
 
 test "temperature: abs + delta -> abs" {
-    const TempQ = Quantity(DIM.Temperature);
+    const TempQ = Quantity(Dimensions.Temperature);
 
     const t_abs = TempQ.init(10.0 + 273.15); // 10 °C absolute
     const dF_in_K = 20.0 * 5.0 / 9.0; // 20 °F delta
@@ -261,7 +261,7 @@ test "temperature: abs + delta -> abs" {
 }
 
 test "temperature: delta + abs -> abs" {
-    const TempQ = Quantity(DIM.Temperature);
+    const TempQ = Quantity(Dimensions.Temperature);
 
     const t_abs = TempQ.init(300.0);
     const t_delta = TempQ.init(10.0); // 10 °C delta = 10 K
@@ -272,7 +272,7 @@ test "temperature: delta + abs -> abs" {
 }
 
 test "temperature: delta + delta -> delta" {
-    const TempQ = Quantity(DIM.Temperature);
+    const TempQ = Quantity(Dimensions.Temperature);
 
     const d1 = TempQ{ .value = 10.0, .is_delta = true };
     const d2 = TempQ{ .value = 18.0 * 5.0 / 9.0, .is_delta = true };
@@ -283,7 +283,7 @@ test "temperature: delta + delta -> delta" {
 }
 
 test "temperature: abs - abs -> delta" {
-    const TempQ = Quantity(DIM.Temperature);
+    const TempQ = Quantity(Dimensions.Temperature);
 
     const a = TempQ.init(310.0);
     const b = TempQ.init(20.0 + 273.15);
@@ -294,7 +294,7 @@ test "temperature: abs - abs -> delta" {
 }
 
 test "temperature: abs - delta -> abs" {
-    const TempQ = Quantity(DIM.Temperature);
+    const TempQ = Quantity(Dimensions.Temperature);
 
     const a = TempQ.init(300.0);
     const d = TempQ{ .value = 20.0, .is_delta = true };

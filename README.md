@@ -63,19 +63,22 @@ pub fn main() !void {
     const Length = dim.Quantity(dim.DIM.Length);
     const Time = dim.Quantity(dim.DIM.Time);
 
-    // perform operations with quantities
-    const d = Length.init(100.0);
-    const t = Time.init(9.58);
-    const v = d.div(t);
+    // quantities in canonical SI units
+    const d0 = Length.init(100.0); // 100 m
+    const t0 = Time.init(10.0);   // 10 s
 
-    // print a unit
-    try io.printf("speed: {f} m/s\n", .{v});
-    // print a unit with a chosen unit registry and formatting mode
-    try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
-
-    // print in a specific compound unit
+    // quantities with explicit units
     const km = dim.findUnitAll("km").?;
     const h = dim.findUnitAll("h").?;
+    const d = try Length.from(100.0, km); // 100 km
+    const t = try Time.from(1.0, h);     // 1 hour
+    const v = d.div(t);
+
+    // print with default formatting
+    try io.printf("speed: {f} m/s\n", .{v});
+    // print with a unit registry and formatting mode
+    try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
+    // print in a specific compound unit
     const kmh = try km.div(h, "km/h");
     try io.printf("speed: {f}\n", .{v.AsUnit(kmh, .none)});
 

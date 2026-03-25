@@ -54,6 +54,11 @@ pub fn Quantity(comptime Dim: Dimension) type {
             return .{ .value = v, .is_delta = false };
         }
 
+        pub fn from(v: f64, u: Unit) error{DimensionMismatch}!Quantity(Dim) {
+            if (!Dimension.eql(u.dim, Dim)) return error.DimensionMismatch;
+            return .{ .value = u.toCanonical(v), .is_delta = false };
+        }
+
         pub fn format(
             self: Quantity(Dim),
             writer: *std.Io.Writer,

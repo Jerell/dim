@@ -73,6 +73,12 @@ pub fn main() !void {
     // print a unit with a chosen unit registry and formatting mode
     try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
 
+    // print in a specific compound unit
+    const km = dim.findUnitAll("km").?;
+    const h = dim.findUnitAll("h").?;
+    const kmh = try km.div(h, "km/h");
+    try io.printf("speed: {f}\n", .{v.AsUnit(kmh, .none)});
+
     // search for a unit
     const u = dim.findUnitAllDynamic("erg", null);
     if (u) |val| {

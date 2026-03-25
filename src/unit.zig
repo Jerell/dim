@@ -34,6 +34,24 @@ pub const Unit = struct {
         }
         return self.fromCanonical(q.value);
     }
+
+    pub fn mul(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.offset != 0.0 or other.offset != 0.0) return error.AffineUnitCombination;
+        return .{
+            .dim = Dimension.add(self.dim, other.dim),
+            .scale = self.scale * other.scale,
+            .symbol = symbol,
+        };
+    }
+
+    pub fn div(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.offset != 0.0 or other.offset != 0.0) return error.AffineUnitCombination;
+        return .{
+            .dim = Dimension.sub(self.dim, other.dim),
+            .scale = self.scale / other.scale,
+            .symbol = symbol,
+        };
+    }
 };
 
 pub const UnitRegistry = struct {

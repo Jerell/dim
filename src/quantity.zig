@@ -54,7 +54,12 @@ pub fn Quantity(comptime Dim: Dimension) type {
             return .{ .value = v, .is_delta = false };
         }
 
-        pub fn from(v: f64, u: Unit) error{DimensionMismatch}!Quantity(Dim) {
+        pub fn from(v: f64, comptime u: Unit) Quantity(Dim) {
+            if (comptime !Dimension.eql(u.dim, Dim)) @compileError("unit dimension mismatch");
+            return .{ .value = u.toCanonical(v), .is_delta = false };
+        }
+
+        pub fn fromDynamic(v: f64, u: Unit) error{DimensionMismatch}!Quantity(Dim) {
             if (!Dimension.eql(u.dim, Dim)) return error.DimensionMismatch;
             return .{ .value = u.toCanonical(v), .is_delta = false };
         }

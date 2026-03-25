@@ -83,11 +83,11 @@ pub fn main() !void {
     // print with default formatting
     try io.printf("speed: {f} m/s\n", .{v});
     // print with a unit registry and formatting mode
-    try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
+    try io.printf("speed: {f}\n", .{v.with(dim.Registries.si, .scientific)});
     // print in a specific compound unit
     const h = dim.findUnitAll("h").?;
     const kmh = try km.div(h, "km/h");
-    try io.printf("speed: {f}\n", .{v.AsUnit(kmh, .none)});
+    try io.printf("speed: {f}\n", .{v.asUnit(kmh, .none)});
 
     // evaluate string expressions
     const allocator = std.heap.page_allocator;

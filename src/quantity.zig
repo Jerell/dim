@@ -76,7 +76,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
         }
 
         /// Wrapper type for custom formatting
-        pub fn With(self: Quantity(Dim), reg: UnitRegistry, mode: Format.FormatMode) FormatWrapper {
+        pub fn with(self: Quantity(Dim), reg: UnitRegistry, mode: Format.FormatMode) FormatWrapper {
             return .{ .q = self, .reg = reg, .mode = mode };
         }
 
@@ -97,7 +97,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
             }
         };
 
-        pub fn AsUnit(self: Quantity(Dim), u: Unit, mode: Format.FormatMode) FormatUnitWrapper {
+        pub fn asUnit(self: Quantity(Dim), u: Unit, mode: Format.FormatMode) FormatUnitWrapper {
             return .{ .q = self, .u = u, .mode = mode };
         }
 

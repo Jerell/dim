@@ -60,6 +60,7 @@ pub fn main() !void {
     var io = Io.init();
     defer io.flushAll() catch |e| std.debug.print("flush error: {s}\n", .{@errorName(e)});
 
+    const Si = dim.Units.si;
     const Length = dim.Quantity(dim.DIM.Length);
     const Time = dim.Quantity(dim.DIM.Time);
 
@@ -67,18 +68,23 @@ pub fn main() !void {
     const d0 = Length.init(100.0); // 100 m
     const t0 = Time.init(10.0);   // 10 s
 
-    // quantities with explicit units (comptime dimension check)
-    const Si = dim.Units.si;
-    const d = Length.from(100.0, Si.km); // 100 km
-    const t = Time.from(1.0, Si.h);     // 1 hour
-    const v = d.div(t);
+    // quantities from comptime units (dimension checked at compile time)
+    const d1 = Si.km.quantity(100.0);    // 100 km
+    const t1 = Si.h.quantity(1.0);       // 1 hour
+    const d1b = Length.from(100.0, Si.km); // equivalent
+
+    // quantities from runtime units (dimension checked at runtime)
+    const km = dim.findUnitAll("km").?;
+    const d2 = try Length.fromDynamic(100.0, km); // 100 km
+
+    // typed arithmetic — v is Quantity(Velocity)
+    const v = d1.div(t1);
 
     // print with default formatting
     try io.printf("speed: {f} m/s\n", .{v});
     // print with a unit registry and formatting mode
     try io.printf("speed: {f}\n", .{v.With(dim.Registries.si, .scientific)});
     // print in a specific compound unit
-    const km = dim.findUnitAll("km").?;
     const h = dim.findUnitAll("h").?;
     const kmh = try km.div(h, "km/h");
     try io.printf("speed: {f}\n", .{v.AsUnit(kmh, .none)});

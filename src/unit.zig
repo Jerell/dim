@@ -27,6 +27,10 @@ pub const Unit = struct {
         };
     }
 
+    pub fn quantity(comptime self: Unit, v: f64) Quantity(self.dim) {
+        return .{ .value = self.toCanonical(v), .is_delta = false };
+    }
+
     pub fn to(self: Unit, q: anytype) f64 {
         // Ensure dimensions match
         if (!Dimension.eql(self.dim, @TypeOf(q).dim)) {

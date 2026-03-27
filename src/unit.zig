@@ -9,6 +9,10 @@ pub const Unit = struct {
     offset: f64 = 0.0,
     symbol: []const u8,
 
+    pub fn isAffine(self: Unit) bool {
+        return self.offset != 0.0;
+    }
+
     pub fn toCanonical(self: Unit, v: f64) f64 {
         return (v + self.offset) * self.scale;
     }
@@ -29,8 +33,8 @@ pub const Unit = struct {
         return self.fromCanonical(q.value);
     }
 
-    pub fn mul(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.offset != 0.0 or other.offset != 0.0) return error.AffineUnitCombination;
+    pub fn mul(self: Unit, other: Unit, symbol: []const u8) Unit {
+        std.debug.assert(!self.isAffine() and !other.isAffine());
         return .{
             .dim = Dimension.add(self.dim, other.dim),
             .scale = self.scale * other.scale,
@@ -38,8 +42,13 @@ pub const Unit = struct {
         };
     }
 
-    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.offset != 0.0) return error.AffineUnitCombination;
+    pub fn mulChecked(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
+        return self.mul(other, symbol);
+    }
+
+    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) Unit {
+        std.debug.assert(!self.isAffine());
         return .{
             .dim = Dimension.pow(self.dim, exponent),
             .scale = std.math.pow(f64, self.scale, @floatFromInt(exponent)),
@@ -47,13 +56,23 @@ pub const Unit = struct {
         };
     }
 
-    pub fn div(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.offset != 0.0 or other.offset != 0.0) return error.AffineUnitCombination;
+    pub fn powChecked(self: Unit, exponent: i32, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.isAffine()) return error.AffineUnitCombination;
+        return self.pow(exponent, symbol);
+    }
+
+    pub fn div(self: Unit, other: Unit, symbol: []const u8) Unit {
+        std.debug.assert(!self.isAffine() and !other.isAffine());
         return .{
             .dim = Dimension.sub(self.dim, other.dim),
             .scale = self.scale / other.scale,
             .symbol = symbol,
         };
+    }
+
+    pub fn divChecked(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
+        return self.div(other, symbol);
     }
 };
 

@@ -248,6 +248,15 @@ test "force = mass * acceleration" {
     try std.testing.expectApproxEqAbs(19.62, f.value, 1e-9);
 }
 
+test "unit composition supports unchecked and checked affine handling" {
+    const kmh = _si.km.div(_si.h, "km/h");
+    try std.testing.expect(Dimension.eql(kmh.dim, Dimensions.Velocity));
+    try std.testing.expectApproxEqAbs(1000.0 / 3600.0, kmh.scale, 1e-12);
+
+    try std.testing.expectError(error.AffineUnitCombination, _si.C.divChecked(_si.h, "C/h"));
+    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powChecked(2, "F^2"));
+}
+
 test "temperature: abs + delta -> abs" {
     const TempQ = Quantity(Dimensions.Temperature);
 

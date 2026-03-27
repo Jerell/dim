@@ -86,8 +86,12 @@ pub fn main() !void {
     try io.printf("speed: {f}\n", .{v.with(dim.Registries.si, .scientific)});
     // print in a specific compound unit
     const h = dim.findUnitAll("h").?;
-    const kmh = try km.div(h, "km/h");
+    const kmh = km.div(h, "km/h");
     try io.printf("speed: {f}\n", .{v.asUnit(kmh, .none)});
+
+    // or keep the runtime check when units may be affine
+    const safe_kmh = try km.divChecked(h, "km/h");
+    try io.printf("speed: {f}\n", .{v.asUnit(safe_kmh, .none)});
 
     // evaluate string expressions
     const allocator = std.heap.page_allocator;

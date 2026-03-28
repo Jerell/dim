@@ -1,50 +1,5 @@
 const std = @import("std");
 
-// Parser exports
-pub const Scanner = @import("parser/scanner.zig").Scanner;
-pub const Parser = @import("parser/parser.zig").Parser;
-pub const reportTokenError = @import("parser/parser.zig").reportTokenError;
-pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
-pub const Expr = @import("parser/expressions.zig").Expr;
-pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;
-
-/// Evaluate a string expression. Returns null on parse/eval errors.
-/// Pass an error writer to receive error messages, or null to discard them.
-/// The returned LiteralValue (if .display_quantity) has its .unit string
-/// allocated with the provided allocator. All intermediate scanner/parser
-/// allocations are cleaned up automatically via an internal arena.
-pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) ?LiteralValue {
-    // Use an arena for scanner tokens, parser AST nodes, and intermediate strings.
-    // Only the final result's owned strings are duped into the caller's allocator.
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
-    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
-    const tokens = scanner.scanTokens() catch return null;
-    var parser = Parser.init(arena_alloc, tokens, err_writer);
-    const expr = parser.parse() orelse return null;
-    if (parser.hadError) return null;
-    if (tokens[parser.current].type != .Eof) {
-        reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
-        return null;
-    }
-    const result = expr.evaluate(arena_alloc) catch return null;
-
-    // Promote owned strings out of the arena into the caller's allocator
-    return switch (result) {
-        .display_quantity => |dq| LiteralValue{ .display_quantity = .{
-            .value = dq.value,
-            .dim = dq.dim,
-            .unit = allocator.dupe(u8, dq.unit) catch return null,
-            .mode = dq.mode,
-            .is_delta = dq.is_delta,
-        } },
-        .string => |s| LiteralValue{ .string = allocator.dupe(u8, s) catch return null },
-        else => result,
-    };
-}
-
 pub const Dimension = @import("dimension.zig").Dimension;
 pub const Quantity = @import("quantity.zig").Quantity;
 pub const Dimensions = @import("dimension.zig").Dimensions;
@@ -70,83 +25,188 @@ const _imperial = @import("registry/imperial.zig");
 const _cgs = @import("registry/cgs.zig");
 const _industrial = @import("registry/industrial.zig");
 
-// Runtime constants registry (session-scoped)
-var _consts_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-var _consts: std.StringHashMapUnmanaged(Unit) = .{};
-var _const_names: std.ArrayListUnmanaged([]const u8) = .{}; // for stable iteration order
+// Parser exports
+pub const Scanner = @import("parser/scanner.zig").Scanner;
+pub const Parser = @import("parser/parser.zig").Parser;
+pub const reportTokenError = @import("parser/parser.zig").reportTokenError;
+pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
+pub const Expr = @import("parser/expressions.zig").Expr;
+pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;
+pub const ConstantEntry = struct {
+    name: []const u8,
+    unit: Unit,
+};
 
-fn constsAllocator() std.mem.Allocator {
-    return _consts_arena.allocator();
-}
+pub const DimContext = struct {
+    constants_arena: std.heap.ArenaAllocator,
+    scratch_arena: std.heap.ArenaAllocator,
+    consts: std.StringHashMapUnmanaged(Unit) = .{},
+    const_names: std.ArrayListUnmanaged([]const u8) = .{},
 
-pub fn defineConstant(name_in: []const u8, dq: DisplayQuantity) !void {
-    const a = constsAllocator();
-    // Copy symbol into arena to ensure lifetime
-    const name = try std.fmt.allocPrint(a, "{s}", .{name_in});
+    pub fn init(backing_allocator: std.mem.Allocator) DimContext {
+        return .{
+            .constants_arena = std.heap.ArenaAllocator.init(backing_allocator),
+            .scratch_arena = std.heap.ArenaAllocator.init(backing_allocator),
+        };
+    }
 
-    // Build Unit: 1 <name> equals dq.value canonical in dimension dq.dim
-    const u = Unit{
-        .dim = dq.dim,
-        .scale = dq.value,
-        .offset = 0.0,
-        .symbol = name,
-    };
+    pub fn deinit(self: *DimContext) void {
+        self.constants_arena.deinit();
+        self.scratch_arena.deinit();
+        self.consts = .{};
+        self.const_names = .{};
+    }
 
-    const gpa = a; // same allocator
-    // Insert or update
-    const existing = _consts.get(name_in);
-    if (existing == null) {
-        try _consts.put(gpa, name, u);
-        try _const_names.append(gpa, name);
-    } else {
-        // Update in-place by re-put on same key slice; ensure we find the stored key
-        // Overwrite by removing and inserting with arena-copied name to keep symbol stable
-        _ = _consts.remove(name_in);
-        try _consts.put(gpa, name, u);
-        // Keep names list as-is if already present; ensure it's present once
-        var found: bool = false;
-        for (_const_names.items) |n| {
-            if (std.mem.eql(u8, n, name_in)) {
-                found = true;
+    fn constAllocator(self: *DimContext) std.mem.Allocator {
+        return self.constants_arena.allocator();
+    }
+
+    fn scratchAllocator(self: *DimContext) std.mem.Allocator {
+        _ = self.scratch_arena.reset(.retain_capacity);
+        return self.scratch_arena.allocator();
+    }
+
+    pub fn defineConstant(self: *DimContext, name_in: []const u8, dq: DisplayQuantity) !void {
+        const a = self.constAllocator();
+        const name = try std.fmt.allocPrint(a, "{s}", .{name_in});
+        const u = Unit{
+            .dim = dq.dim,
+            .scale = dq.value,
+            .offset = 0.0,
+            .symbol = name,
+        };
+
+        if (self.consts.get(name_in) == null) {
+            try self.consts.put(a, name, u);
+            try self.const_names.append(a, name);
+            return;
+        }
+
+        _ = self.consts.remove(name_in);
+        try self.consts.put(a, name, u);
+
+        for (self.const_names.items) |n| {
+            if (std.mem.eql(u8, n, name_in)) return;
+        }
+        try self.const_names.append(a, name);
+    }
+
+    pub fn getConstant(self: *DimContext, symbol: []const u8) ?Unit {
+        return self.consts.get(symbol);
+    }
+
+    pub fn clearConstant(self: *DimContext, name: []const u8) void {
+        _ = self.consts.remove(name);
+        var i: usize = 0;
+        while (i < self.const_names.items.len) : (i += 1) {
+            if (std.mem.eql(u8, self.const_names.items[i], name)) {
+                _ = self.const_names.orderedRemove(i);
                 break;
             }
         }
-        if (!found) try _const_names.append(gpa, name);
     }
+
+    pub fn clearAllConstants(self: *DimContext) void {
+        self.consts.clearRetainingCapacity();
+        self.const_names.clearRetainingCapacity();
+        _ = self.constants_arena.reset(.retain_capacity);
+    }
+
+    pub fn constantsCount(self: *DimContext) usize {
+        return self.const_names.items.len;
+    }
+
+    pub fn constantByIndex(self: *DimContext, index: usize) ?ConstantEntry {
+        if (index >= self.const_names.items.len) return null;
+        const name = self.const_names.items[index];
+        const unit = self.consts.get(name) orelse return null;
+        return .{ .name = name, .unit = unit };
+    }
+};
+
+var _default_context = DimContext.init(std.heap.page_allocator);
+var _active_context: ?*DimContext = null;
+
+fn currentContext() *DimContext {
+    return _active_context orelse &_default_context;
+}
+
+pub fn deinitLiteralValue(allocator: std.mem.Allocator, value: *LiteralValue) void {
+    switch (value.*) {
+        .display_quantity => |*dq| dq.deinit(allocator),
+        .string => |s| allocator.free(s),
+        else => {},
+    }
+    value.* = .nil;
+}
+
+pub fn evaluateWithContext(
+    ctx: *DimContext,
+    result_allocator: std.mem.Allocator,
+    source: []const u8,
+    err_writer: ?*std.Io.Writer,
+) ?LiteralValue {
+    const previous_ctx = _active_context;
+    _active_context = ctx;
+    defer _active_context = previous_ctx;
+
+    const arena_alloc = ctx.scratchAllocator();
+
+    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
+    const tokens = scanner.scanTokens() catch return null;
+    var parser = Parser.init(arena_alloc, tokens, err_writer);
+    const expr = parser.parse() orelse return null;
+    if (parser.hadError) return null;
+    if (tokens[parser.current].type != .Eof) {
+        reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
+        return null;
+    }
+    const result = expr.evaluate(arena_alloc) catch return null;
+
+    return switch (result) {
+        .display_quantity => |dq| LiteralValue{ .display_quantity = .{
+            .value = dq.value,
+            .dim = dq.dim,
+            .unit = result_allocator.dupe(u8, dq.unit) catch return null,
+            .mode = dq.mode,
+            .is_delta = dq.is_delta,
+        } },
+        .string => |s| LiteralValue{ .string = result_allocator.dupe(u8, s) catch return null },
+        else => result,
+    };
+}
+
+/// Evaluate a string expression. Returns null on parse/eval errors.
+/// Pass an error writer to receive error messages, or null to discard them.
+/// The returned LiteralValue (if .display_quantity) has its .unit string
+/// allocated with the provided allocator. All intermediate scanner/parser
+/// allocations are cleaned up automatically via an internal arena.
+pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) ?LiteralValue {
+    return evaluateWithContext(currentContext(), allocator, source, err_writer);
+}
+
+pub fn defineConstant(name_in: []const u8, dq: DisplayQuantity) !void {
+    try currentContext().defineConstant(name_in, dq);
 }
 
 pub fn getConstant(symbol: []const u8) ?Unit {
-    if (_consts.get(symbol)) |u| return u;
-    return null;
+    return currentContext().getConstant(symbol);
 }
 
 pub fn clearConstant(name: []const u8) void {
-    _ = _consts.remove(name);
-    // Remove from names list
-    var i: usize = 0;
-    while (i < _const_names.items.len) : (i += 1) {
-        if (std.mem.eql(u8, _const_names.items[i], name)) {
-            _ = _const_names.orderedRemove(i);
-            break;
-        }
-    }
+    currentContext().clearConstant(name);
 }
 
 pub fn clearAllConstants() void {
-    _consts.clearRetainingCapacity();
-    _const_names.clearRetainingCapacity();
-    _ = _consts_arena.reset(.retain_capacity);
+    currentContext().clearAllConstants();
 }
 
 pub fn constantsCount() usize {
-    return _const_names.items.len;
+    return currentContext().constantsCount();
 }
 
-pub fn constantByIndex(index: usize) ?struct { name: []const u8, unit: Unit } {
-    if (index >= _const_names.items.len) return null;
-    const n = _const_names.items[index];
-    const u = _consts.get(n) orelse return null;
-    return .{ .name = n, .unit = u };
+pub fn constantByIndex(index: usize) ?ConstantEntry {
+    return currentContext().constantByIndex(index);
 }
 
 /// Search across all built-in registries
@@ -311,4 +371,31 @@ test "temperature: abs - delta -> abs" {
     const res = a.sub(d);
     try std.testing.expect(!res.is_delta);
     try std.testing.expectApproxEqAbs(280.0, res.value, 1e-9);
+}
+
+test "context-scoped constants do not leak across contexts" {
+    var ctx_a = DimContext.init(std.testing.allocator);
+    defer ctx_a.deinit();
+    var ctx_b = DimContext.init(std.testing.allocator);
+    defer ctx_b.deinit();
+
+    var define_a = evaluateWithContext(&ctx_a, std.testing.allocator, "foo = (2 m)", null) orelse return error.TestUnexpectedResult;
+    defer deinitLiteralValue(std.testing.allocator, &define_a);
+
+    try std.testing.expect(ctx_a.getConstant("foo") != null);
+    try std.testing.expect(ctx_b.getConstant("foo") == null);
+
+    var res_a = evaluateWithContext(&ctx_a, std.testing.allocator, "1 foo as m", null) orelse return error.TestUnexpectedResult;
+    defer deinitLiteralValue(std.testing.allocator, &res_a);
+
+    try std.testing.expectEqual(@as(usize, 1), ctx_a.constantsCount());
+    try std.testing.expectEqual(@as(usize, 0), ctx_b.constantsCount());
+
+    const missing_b = evaluateWithContext(&ctx_b, std.testing.allocator, "1 foo as m", null);
+    try std.testing.expect(missing_b == null);
+
+    switch (res_a) {
+        .display_quantity => |dq| try std.testing.expectApproxEqAbs(2.0, dq.value, 1e-9),
+        else => return error.TestUnexpectedResult,
+    }
 }

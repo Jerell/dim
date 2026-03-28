@@ -32,7 +32,7 @@ Today `dim` supports this:
 But not this:
 
 - `1 m^0.5`
-- `1 as m^(1/2)`
+- `1 m^(1/2) as m^(1/2)`
 - `(1 m)^0.5`
 - `1 Pa^0.5`
 - carrying exact `1/3`, `1/2`, or `-3/2` exponents through formatting and FFI
@@ -51,14 +51,24 @@ not:
 - `m^(1/2)`, `m^(3/2)`, `s^(-1/2)`, and similar units should be representable internally.
 - Raising a dimensional quantity to a rational power should produce an exact rational dimension.
 - Integer exponent behavior should remain unchanged.
+- Runtime dimensional exponents should come from exact rational syntax or an explicit `Rational` API, not from best-effort reconstruction of arbitrary `f64` values.
 - Irrational or non-representable exponents on dimensional quantities should still error.
-  - Example: `m^pi` should not silently produce an approximate dimension.
+  - Example: `(1 m)^pi` should not silently produce an approximate dimension.
 - Formatting should preserve rational exponents in a stable canonical form.
-- The C ABI should have a versioned path for exposing rational dimensions without losing information.
+- When a normalized unit contains any non-integer exponent, canonical output should use `*`-joined signed exponents rather than numerator/denominator rewriting.
+  - Examples: `m^(1/2)`, `m^(1/2)*s^(-1/2)`, `kg^(1/2)*m^(-1/2)*s^(-1)`.
+- The current structured ABI should expose rational dimensions directly, even if that changes the existing struct layout.
+- `as` should remain a conversion operator, not a type annotation. Acceptance tests after `as` must start from a quantity that already has the target dimension.
 
 ## Recommendation
 
 Implement this as exact rational arithmetic, not as `f64` exponents with tolerance checks.
+
+Recommendation for scope:
+
+- treat this as one coordinated breaking change in `dim`
+- update local consumers under `/Users/jerell/Repos` as part of the same work
+- use internal sequencing for safety, but consider the feature complete only when parser, formatting, ABI, and tests all pass together
 
 Recommendation for the core model:
 
@@ -66,7 +76,7 @@ Recommendation for the core model:
 - make each `Dimension` component a normalized `Rational`
 - keep integer-focused convenience constructors and constants so existing code stays readable
 
-This is a deeper change than the pressure-units work. It touches the type system, parser, formatting, and ABI all at once, so it should land in phases.
+This is a deeper change than the pressure-units work. It touches the type system, parser, formatting, and ABI all at once, so it should be implemented in phases internally even if it ships as one coordinated feature.
 
 ## Proposed Design
 
@@ -118,16 +128,17 @@ Recommended replacement:
 
 - `Quantity.powInt(exponent: i32)`
 - `Quantity.powRational(exponent: Rational)`
-- `Unit.powInt(...)`
-- `Unit.powRational(...)`
-- `DisplayQuantity.powInt(...)`
-- `DisplayQuantity.powRational(...)`
+- `Unit.powInt(exponent: i32, symbol: []const u8)`
+- `Unit.powRational(exponent: Rational, symbol: []const u8)`
+- `powDisplayInt(...)`
+- `powDisplayRational(...)`
 
-Then layer convenience overloads on top:
+Compatibility rule:
 
-- integers keep using the int path
-- decimal literals or `a/b` literals can lower into `Rational`
+- keep an integer-only convenience wrapper like `pow(...)` only if it forwards to `powInt(...)`
+- remove the current float-based dimensional `pow(...)` path
 - pure number bases can still use normal `f64` power rules
+- compile-time dimensional callers should use an explicit `Rational` helper such as `Rational.init(1, 2)` rather than float reconstruction
 
 This keeps dimensional math exact while leaving scalar math flexible.
 
@@ -140,10 +151,10 @@ There are two separate parser surfaces to update.
 For general expressions in [src/parser/expressions.zig](/Users/jerell/Repos/dim/src/parser/expressions.zig#L175):
 
 - keep `number ^ number` as normal floating-point numeric math
-- for `quantity ^ exponent`, require the exponent to be extractable as an exact rational
-- if the exponent is not exactly representable as a rational under the supported syntax, return a dimensional-power error
+- for `quantity ^ exponent`, inspect the exponent syntax and require it to lower to an exact `Rational`
+- if the exponent is not one of the supported exact-rational forms, return a dedicated dimensional-power error such as `NonRationalDimensionalExponent`
 
-Recommended supported exponent syntax for dimensional powers:
+Supported v1 exponent syntax for dimensional powers:
 
 - integer literal: `2`
 - decimal literal: `0.5`
@@ -152,6 +163,7 @@ Recommended supported exponent syntax for dimensional powers:
 Recommendation:
 
 - parse and preserve exact rational exponents from syntax, instead of reconstructing them heuristically from already-evaluated `f64`
+- reject arbitrary exponent expressions like `pi`, `sqrt(2)`, or `(1/2 + 0)` for dimensional powers
 
 #### Unit-expression powers
 
@@ -163,10 +175,16 @@ Update this so unit expressions can accept and preserve:
 - `m^(1/2)`
 - `s^(-3/2)`
 
+Unit-expression grammar rule:
+
+- store the parsed exponent as `Rational`
+- allow literal exact-rational syntax only
+- treat `m^pi` and `m^(sqrt(2))` in unit expressions as parse errors, not best-effort runtime coercions
+
 Recommendation for normalized output:
 
 - use `^(num/den)` for non-integer exponents
-- keep superscripts only for integer exponents
+- keep existing integer notation for integer-only exponents
 
 That gives unambiguous output and avoids inventing Unicode fractional superscripts.
 
@@ -184,12 +202,20 @@ Recommended canonical notation:
 
 - `m^(1/2)`
 - `s^(-3/2)`
-- `kg*m^(1/2)/s`
+- `m^(1/2)*s^(-1/2)`
+- `kg^(1/2)*m^(-1/2)*s^(-1)`
+
+Formatting rule for the first patch:
+
+- if every exponent is an integer, keep existing integer-focused formatting behavior
+- if any exponent is non-integer, emit the whole canonical unit string as a `*`-joined product with signed exponents
+- do not rewrite rational outputs into `1/(...)` form in the first patch
 
 Recommendation for factoring:
 
 - keep derived-unit factoring conservative for the first patch
-- only factor a registry unit when its dimension exactly matches a rational remainder target
+- only factor a registry unit when its dimension exactly matches the full target dimension
+- do not emit rational powers of registry aliases in the first patch
 - avoid trying to invent algebraically clever factorizations until the exact-rational base path is stable
 
 ### 6. Keep Affine Units Out of Fractional Powers
@@ -206,125 +232,121 @@ Examples:
 
 Fractional exponent support should not weaken affine-unit safety.
 
-### 7. Add a Versioned ABI for Rational Dimensions
+### 7. Update the Existing ABI for Rational Dimensions
 
 The current ABI in [dim.h](/Users/jerell/Repos/dim/dim.h#L46) and [src/wasm.zig](/Users/jerell/Repos/dim/src/wasm.zig#L32) cannot represent rational exponents.
 
 Recommendation:
 
-- do not silently overload the existing `dim_L`, `dim_M`, etc. integer fields
-- add a new versioned ABI surface instead
+- make breaking changes to the current `DimEvalResult` and `DimQuantityResult`
+- update [dim.h](/Users/jerell/Repos/dim/dim.h), [src/wasm.zig](/Users/jerell/Repos/dim/src/wasm.zig), and local consumers together
+- use flat numerator/denominator field pairs for each dimension component so the Wasm memory layout stays easy to consume from TypeScript and Rust
+- encode every integer exponent as `n/1`
 
 Suggested shape:
 
 ```c
-typedef struct DimRational {
-  int32_t num;
-  uint32_t den;
-} DimRational;
+typedef struct DimQuantityResult {
+  uint32_t mode;
+  uint32_t is_delta;
+  double value;
+  int32_t dim_L_num;
+  uint32_t dim_L_den;
+  int32_t dim_M_num;
+  uint32_t dim_M_den;
+  /* ... */
+  uintptr_t unit_ptr;
+  size_t unit_len;
+} DimQuantityResult;
 ```
 
-Then introduce new result structs or v2 functions, for example:
+Important consequence:
 
-- `DimEvalResultV2`
-- `DimQuantityResultV2`
-- `dim_ctx_eval_v2(...)`
-- `dim_ctx_convert_expr_v2(...)`
+- the local wrappers in `/Users/jerell/Repos/Pace/mor05/frontend`, `/Users/jerell/Repos/Pace/mor05/bff`, and `/Users/jerell/Repos/dagger` must be patched in the same implementation because they currently assume integer dimension fields and hardcoded struct sizes
 
-This keeps existing consumers working while providing a correct path for rational dimensions in the exported ABI.
+## Implementation Sequence
 
-## Phased Rollout
-
-### Phase 1
+This should ship as one coordinated feature, but the internal sequence should be:
 
 - Add `Rational`
 - Convert `Dimension` internals to exact rationals
 - Preserve all existing integer-based APIs via helper constructors
-- Keep behavior unchanged for existing integer-dimension operations
-
-### Phase 2
-
 - Replace `powDimFloat(...)` with exact rational dimension multiplication
 - Add runtime and compile-time rational power helpers
-- Keep current integer-power callers working
-
-### Phase 3
-
 - Extend unit-expression parsing to accept rational exponents
 - Extend general expression power handling so dimensional powers require exact rational exponents
-- Normalize non-integer exponents to `^(num/den)`
-
-### Phase 4
-
 - Update `format.normalizeUnitString(...)` and related formatting paths for rational dimensions
-- Add tests for canonical output strings
-
-### Phase 5
-
-- Add versioned ABI structs and functions for rational dimensions
-- Keep the current ABI available for existing consumers
-- Update wrapper guidance docs after the new ABI lands
+- Break the current ABI field layout to expose rational dimensions directly
+- Patch local consumers and wrapper docs alongside the ABI change
+- Add and pass new tests for core logic, parser/formatter behavior, ABI, and local consumers
 
 ## Test Plan
 
-### Compile-time quantity tests
+New behavior is not complete until tests exist for the exact expected outputs below.
 
-- `Quantity(Area).pow(0.5)` yields `Quantity(Length)`
-- `Quantity(Volume).pow(1.0 / 3.0)` yields `Quantity(Length)` if the exponent is provided via exact rational syntax/helper
-- `Quantity(Length).pow(0.5)` yields a rational-dimension quantity rather than compile-erroring
+### Library tests in [src/root.zig](/Users/jerell/Repos/dim/src/root.zig)
 
-### Runtime expression tests
+- `Rational.init(2, 4)` normalizes to `1/2`
+- `Rational.init(-2, -4)` normalizes to `1/2`
+- `Rational.init(0, 5)` normalizes to `0/1`
+- `Dimension.mulByRational(Dimensions.Length, Rational.init(1, 2))` yields `L^(1/2)`
+- `Quantity(Dimensions.Area).init(16).powRational(Rational.init(1, 2))` has dimension `Length` and value `4`
+- `Quantity(Dimensions.Length).init(9).powRational(Rational.init(1, 2))` has dimension `L^(1/2)` and value `3`
+- `Unit.powRational(...)` computes exact rational dimensions and multiplicative scale correctly for non-affine units
+- `Unit.powRational(...)` rejects affine units
 
-- `(16 m^2)^0.5 -> 4 m`
-- `(9 m)^0.5 -> 3 m^(1/2)`
-- `(1 m/s)^0.5 -> 1 m^(1/2)/s^(1/2)`
-- `(1 m)^1.5 -> 1 m^(3/2)`
-- `1 Pa^0.5`
+### End-to-end parser, runtime, and formatting tests in [src/main.zig](/Users/jerell/Repos/dim/src/main.zig)
 
-### Unit-expression parsing tests
+- `(16 m^2)^0.5` evaluates to value `4`, dimension `Length`, and unit string `m`
+- `(9 m)^0.5` evaluates to value `3`, dimension `L^(1/2)`, and unit string `m^(1/2)`
+- `(1 m/s)^0.5` evaluates to value `1` and unit string `m^(1/2)*s^(-1/2)`
+- `(1 m)^1.5` evaluates to value `1` and unit string `m^(3/2)`
+- `1 Pa^0.5` evaluates to value `1` and unit string `kg^(1/2)*m^(-1/2)*s^(-1)`
+- `1 m^(1/2) as m^(1/2)` round-trips as value `1` with unit string `m^(1/2)`
+- `1 s^(-1/2) as s^(-1/2)` round-trips as value `1` with unit string `s^(-1/2)`
 
-- `1 as m^(1/2)`
-- `1 as s^(-1/2)`
-- `1 as kg*m^(1/2)/s`
-- round-tripping normalized strings with rational exponents
+### Rejection tests in [src/main.zig](/Users/jerell/Repos/dim/src/main.zig) and parser-focused tests where appropriate
 
-### Rejection tests
-
-- `1 C^0.5`
+- `1 C^0.5` errors because affine units cannot be exponentiated fractionally
+- `1 C^(1/2)` errors for the same reason
 - `1 barg^0.5` once gauge pressure exists
-- `1 m^pi`
-- `1 m^(sqrt(2))`
+- `(1 m)^pi` returns `NonRationalDimensionalExponent`
+- `(1 m)^(sqrt(2))` returns `NonRationalDimensionalExponent`
+- `1 m as m^pi` is a parse error in unit-expression grammar
+- `1 m as m^(sqrt(2))` is a parse error in unit-expression grammar
 
-### ABI tests
+### ABI tests in [src/wasm.zig](/Users/jerell/Repos/dim/src/wasm.zig)
 
-- `dim_ctx_eval_v2(...)` returns `1/2` and `3/2` exponents correctly
-- existing `dim_ctx_eval(...)` behavior remains unchanged for integer-dimension quantities
+- integer dimensions are exposed as `n/1` in the updated result structs
+- evaluating `(9 m)^0.5` exposes `dim_L_num = 1`, `dim_L_den = 2`
+- evaluating `1 Pa^0.5` exposes `dim_M_num = 1`, `dim_M_den = 2`, `dim_L_num = -1`, `dim_L_den = 2`, `dim_T_num = -1`, `dim_T_den = 1`
+- `dim_ctx_convert_expr(...)` returns rational dimensions correctly for rational target units
+
+### Consumer verification
+
+- patch and run the local wrappers in `/Users/jerell/Repos/Pace/mor05/frontend`, `/Users/jerell/Repos/Pace/mor05/bff`, and `/Users/jerell/Repos/dagger`
+- update any hardcoded Wasm struct sizes and offsets in those consumers
+- run their relevant unit or integration tests after the ABI change
 
 ## Migration Notes
 
 - Existing code that only uses integer-dimension quantities should continue to behave the same.
-- Existing formatting should remain stable for integer exponents.
-- Existing ABI consumers should not be forced onto the rational-dimension path immediately.
-- ABI docs should explicitly call out that:
-  - legacy ABI exposes only integer dimensions
-  - v2 ABI is required for exact rational dimensions
+- Existing formatting should remain stable for integer-only outputs.
+- Code that currently relies on float-based dimensional `pow(...)` should migrate to `powRational(...)`.
+- The ABI change is intentionally breaking. There is no legacy fallback in this plan.
+- Local consumers in `/Users/jerell/Repos/Pace/mor05/frontend`, `/Users/jerell/Repos/Pace/mor05/bff`, and `/Users/jerell/Repos/dagger` should be updated in the same branch or coordinated set of branches.
 
-## Open Questions
+## Deferred Questions
 
-- Do we want exact rational exponent syntax only, or should we also support best-effort conversion from arbitrary `f64` exponents?
-  - Recommendation: exact syntax only for dimensional powers.
-- Should normalized output always use fractional notation for non-integers, or allow decimal output when it terminates exactly?
-  - Recommendation: always normalize to `^(num/den)`.
-- Do we want to add convenience functions like `sqrt(...)` and `cbrt(...)` once rational exponents exist?
+- Do we want to add convenience functions like `sqrt(...)` and `cbrt(...)` once `powRational(...)` exists?
+- Should `Rational` be re-exported publicly from [src/root.zig](/Users/jerell/Repos/dim/src/root.zig)?
 - Should derived-unit factoring ever produce rational powers of aliases, or should the first version stay base-unit oriented unless an exact alias match exists?
 
-## Suggested First Patch
+## Suggested Implementation Order
 
-If we want the safest first implementation sequence:
-
-1. Add `Rational`
-2. Convert `Dimension` to exact rationals with integer-compatible helpers
-3. Replace the current float-rounding dimension power logic in [src/quantity.zig](/Users/jerell/Repos/dim/src/quantity.zig#L26) and [src/runtime.zig](/Users/jerell/Repos/dim/src/runtime.zig#L135)
-4. Leave parser syntax and ABI versioning for the next patch
-
-That would remove the current “fractional exponent, but only if it rounds back to ints” limitation at the core model level first, which is the right foundation for the parser, formatter, and wrapper work that comes after.
+1. Add `Rational` and convert `Dimension` to exact rational components with integer-friendly helpers.
+2. Replace float-based dimensional power logic with `powInt(...)` and `powRational(...)`.
+3. Extend parser and AST paths to preserve exact rational exponents from source syntax.
+4. Update normalization and formatting so rational dimensions emit canonical signed-exponent strings.
+5. Change the ABI structs in place and patch the local consumers that depend on them.
+6. Add and pass the new library, integration, ABI, and consumer tests before considering the feature done.

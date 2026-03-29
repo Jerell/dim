@@ -25,7 +25,10 @@ pub const mol = dim.Unit{ .dim = dim.Dimensions.Amount, .scale = 1.0, .symbol = 
 pub const cd = dim.Unit{ .dim = dim.Dimensions.Luminous, .scale = 1.0, .symbol = "cd" };
 
 pub const Pa = dim.Unit{ .dim = dim.Dimensions.Pressure, .scale = 1.0, .symbol = "Pa" };
+pub const atm = dim.Unit{ .dim = dim.Dimensions.Pressure, .scale = 101325.0, .symbol = "atm" };
 pub const bar = dim.Unit{ .dim = dim.Dimensions.Pressure, .scale = 1e5, .symbol = "bar" };
+pub const bara = dim.Unit{ .dim = dim.Dimensions.Pressure, .scale = 1e5, .symbol = "bara" };
+pub const barg = dim.Unit{ .dim = dim.Dimensions.Pressure, .scale = 1e5, .offset = 1.01325, .symbol = "barg" };
 
 pub const J = dim.Unit{ .dim = dim.Dimensions.Energy, .scale = 1.0, .symbol = "J" };
 pub const W = dim.Unit{ .dim = dim.Dimensions.Power, .scale = 1.0, .symbol = "W" };
@@ -43,7 +46,8 @@ pub const Units = [_]dim.Unit{
     g,    kg,   t,  s,
     min,  h,    A,  K,
     C,    mol,  cd, Pa,
-    bar,  J,    W,  N,
+    atm,  bar,  bara, barg,
+    J,    W,    N,
     mps,  mps2, m2, m3,
     kgps, Cp,
 };

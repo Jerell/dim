@@ -101,6 +101,24 @@ fn parseFails(allocator: std.mem.Allocator, line: []const u8) !bool {
     return parser.hadError or maybe_expr == null;
 }
 
+fn expectDisplayQuantity(
+    allocator: std.mem.Allocator,
+    line: []const u8,
+    expected_value: f64,
+    expected_unit: []const u8,
+    expected_is_delta: bool,
+) !void {
+    const eval_result = try evalTestExpr(allocator, line);
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(expected_value, dq.value, 1e-9);
+            try std.testing.expectEqual(expected_is_delta, dq.is_delta);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, expected_unit));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
 test "unicode middle dot as multiplication for numbers" {
     var io = Io.init();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
@@ -648,6 +666,33 @@ test "unit conversion -20 C to C" {
         },
         else => std.debug.panic("expected display_quantity result", .{}),
     }
+}
+
+test "pressure unit conversions preserve explicit pressure symbols" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try expectDisplayQuantity(allocator, "1 atm as Pa", 101325.0, "Pa", false);
+    try expectDisplayQuantity(allocator, "1 atm as bar", 1.01325, "bar", false);
+    try expectDisplayQuantity(allocator, "1 atm as atm", 1.0, "atm", false);
+    try expectDisplayQuantity(allocator, "1 bara as bar", 1.0, "bar", false);
+    try expectDisplayQuantity(allocator, "1 bar as bara", 1.0, "bara", false);
+    try expectDisplayQuantity(allocator, "0 barg as bara", 1.01325, "bara", false);
+    try expectDisplayQuantity(allocator, "0 barg as Pa", 101325.0, "Pa", false);
+    try expectDisplayQuantity(allocator, "1 barg as barg", 1.0, "barg", false);
+}
+
+test "pressure subtraction yields pressure deltas in bar" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try expectDisplayQuantity(allocator, "5 bara - 2 bara", 3.0, "bar", true);
+    try expectDisplayQuantity(allocator, "5 barg - 2 barg", 3.0, "bar", true);
+    try expectDisplayQuantity(allocator, "2 barg - 1 bara", 2.01325, "bar", true);
+    try expectDisplayQuantity(allocator, "2 bara - 1 barg", -0.01325, "bar", true);
+    try expectDisplayQuantity(allocator, "(5 bara - 2 bara) as barg", 3.0, "bar", true);
 }
 
 test "mixing superscript and caret notation (kg/m³ + kg/m^3)" {

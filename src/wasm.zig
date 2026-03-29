@@ -512,6 +512,53 @@ test "dim_ctx_convert_value handles affine conversion" {
     try std.testing.expectApproxEqAbs(33.8, out_value, 1e-9);
 }
 
+test "dim_ctx_convert_value handles pressure units" {
+    var ctx = dim.DimContext.init(std.testing.allocator);
+    defer ctx.deinit();
+
+    var out_value: f64 = 0.0;
+
+    try std.testing.expectEqual(statusCode(.ok), dim_ctx_convert_value(&ctx, 1.0, "atm".ptr, "atm".len, "bar".ptr, "bar".len, &out_value));
+    try std.testing.expectApproxEqAbs(1.01325, out_value, 1e-9);
+
+    try std.testing.expectEqual(statusCode(.ok), dim_ctx_convert_value(&ctx, 0.0, "barg".ptr, "barg".len, "bara".ptr, "bara".len, &out_value));
+    try std.testing.expectApproxEqAbs(1.01325, out_value, 1e-9);
+}
+
+test "dim_ctx_eval preserves pressure delta display semantics" {
+    var ctx = dim.DimContext.init(std.testing.allocator);
+    defer ctx.deinit();
+
+    var result = std.mem.zeroes(DimEvalResult);
+    const rc = dim_ctx_eval(&ctx, "5 barg - 2 barg".ptr, "5 barg - 2 barg".len, &result);
+    defer freeEvalResult(&result);
+
+    try std.testing.expectEqual(statusCode(.ok), rc);
+    try std.testing.expectEqual(@as(u32, @intFromEnum(DimValueKind.quantity)), result.kind);
+    try std.testing.expectEqual(@as(u32, 1), result.is_delta);
+    try std.testing.expectApproxEqAbs(3.0, result.quantity_value, 1e-9);
+    try std.testing.expectEqualStrings("bar", (@as([*]const u8, @ptrFromInt(result.unit_ptr)))[0..result.unit_len]);
+}
+
+test "dim_ctx_eval handles mixed barg and bara subtraction" {
+    var ctx = dim.DimContext.init(std.testing.allocator);
+    defer ctx.deinit();
+
+    var positive = std.mem.zeroes(DimEvalResult);
+    defer freeEvalResult(&positive);
+    try std.testing.expectEqual(statusCode(.ok), dim_ctx_eval(&ctx, "2 barg - 1 bara".ptr, "2 barg - 1 bara".len, &positive));
+    try std.testing.expectEqual(@as(u32, 1), positive.is_delta);
+    try std.testing.expectApproxEqAbs(2.01325, positive.quantity_value, 1e-9);
+    try std.testing.expectEqualStrings("bar", (@as([*]const u8, @ptrFromInt(positive.unit_ptr)))[0..positive.unit_len]);
+
+    var negative = std.mem.zeroes(DimEvalResult);
+    defer freeEvalResult(&negative);
+    try std.testing.expectEqual(statusCode(.ok), dim_ctx_eval(&ctx, "2 bara - 1 barg".ptr, "2 bara - 1 barg".len, &negative));
+    try std.testing.expectEqual(@as(u32, 1), negative.is_delta);
+    try std.testing.expectApproxEqAbs(-0.01325, negative.quantity_value, 1e-9);
+    try std.testing.expectEqualStrings("bar", (@as([*]const u8, @ptrFromInt(negative.unit_ptr)))[0..negative.unit_len]);
+}
+
 test "dim_ctx_is_compatible and same_dimension preserve compatibility semantics" {
     var ctx = dim.DimContext.init(std.testing.allocator);
     defer ctx.deinit();

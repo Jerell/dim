@@ -24,6 +24,14 @@ fn isTemperatureDim(comptime D: Dimension) bool {
     return D.L.eqlInt(0) and D.M.eqlInt(0) and D.T.eqlInt(0) and D.I.eqlInt(0) and D.Th.eqlInt(1) and D.N.eqlInt(0) and D.J.eqlInt(0);
 }
 
+fn isPressureDim(comptime D: Dimension) bool {
+    return D.L.eqlInt(-1) and D.M.eqlInt(1) and D.T.eqlInt(-2) and D.I.eqlInt(0) and D.Th.eqlInt(0) and D.N.eqlInt(0) and D.J.eqlInt(0);
+}
+
+fn usesAffineDeltaArithmetic(comptime D: Dimension) bool {
+    return isTemperatureDim(D) or isPressureDim(D);
+}
+
 pub fn Quantity(comptime Dim: Dimension) type {
     return struct {
         pub const dim: Dimension = Dim;
@@ -93,7 +101,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
         };
 
         pub fn add(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
-            if (comptime isTemperatureDim(Dim)) {
+            if (comptime usesAffineDeltaArithmetic(Dim)) {
                 // Always treat RHS as delta if it's not already
                 if (self.is_delta and other.is_delta) {
                     return .{ .value = self.value + other.value, .is_delta = true };
@@ -109,7 +117,7 @@ pub fn Quantity(comptime Dim: Dimension) type {
         }
 
         pub fn sub(self: Quantity(Dim), other: Quantity(Dim)) Quantity(Dim) {
-            if (comptime isTemperatureDim(Dim)) {
+            if (comptime usesAffineDeltaArithmetic(Dim)) {
                 if (!self.is_delta and !other.is_delta) {
                     // abs - abs = delta
                     return .{ .value = self.value - other.value, .is_delta = true };

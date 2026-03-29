@@ -73,7 +73,7 @@ pub const DimContext = struct {
         const name = try std.fmt.allocPrint(a, "{s}", .{name_in});
         const u = Unit{
             .dim = dq.dim,
-            .scale = dq.value,
+            .scale = dq.canonicalValue(),
             .offset = 0.0,
             .symbol = name,
         };
@@ -172,6 +172,7 @@ pub fn evaluateWithContext(
             .unit = result_allocator.dupe(u8, dq.unit) catch return null,
             .mode = dq.mode,
             .is_delta = dq.is_delta,
+            .value_space = dq.value_space,
         } },
         .string => |s| LiteralValue{ .string = result_allocator.dupe(u8, s) catch return null },
         else => result,
@@ -400,6 +401,46 @@ test "temperature: abs - delta -> abs" {
     const res = a.sub(d);
     try std.testing.expect(!res.is_delta);
     try std.testing.expectApproxEqAbs(280.0, res.value, 1e-9);
+}
+
+test "pressure unit helpers treat barg offsets as absolute-only" {
+    try std.testing.expectApproxEqAbs(101325.0, _si.atm.toCanonicalValue(1.0, false), 1e-9);
+    try std.testing.expectApproxEqAbs(101325.0, _si.barg.toCanonicalValue(0.0, false), 1e-9);
+    try std.testing.expectApproxEqAbs(100000.0, _si.barg.toCanonicalValue(1.0, true), 1e-9);
+    try std.testing.expectApproxEqAbs(1.01325, _si.bara.fromCanonicalValue(101325.0, false), 1e-9);
+    try std.testing.expectApproxEqAbs(1.0, _si.barg.fromCanonicalValue(100000.0, true), 1e-9);
+}
+
+test "pressure quantity arithmetic mirrors absolute and delta rules" {
+    const PressureQ = Quantity(Dimensions.Pressure);
+
+    const abs_a = PressureQ.from(5.0, _si.bara);
+    const abs_b = PressureQ.from(2.0, _si.bara);
+    const two_barg = PressureQ.from(2.0, _si.barg);
+    const one_bara = PressureQ.from(1.0, _si.bara);
+    const one_barg = PressureQ.from(1.0, _si.barg);
+    const delta = PressureQ{ .value = _si.bar.toCanonicalValue(3.0, true), .is_delta = true };
+
+    const diff = abs_a.sub(abs_b);
+    try std.testing.expect(diff.is_delta);
+    try std.testing.expectApproxEqAbs(3.0e5, diff.value, 1e-9);
+    try std.testing.expectApproxEqAbs(3.0, _si.bar.fromCanonicalValue(diff.value, diff.is_delta), 1e-9);
+    try std.testing.expectApproxEqAbs(3.0, _si.bara.fromCanonicalValue(diff.value, diff.is_delta), 1e-9);
+    try std.testing.expectApproxEqAbs(3.0, _si.barg.fromCanonicalValue(diff.value, diff.is_delta), 1e-9);
+
+    const sum = abs_b.add(delta);
+    try std.testing.expect(!sum.is_delta);
+    try std.testing.expectApproxEqAbs(5.0e5, sum.value, 1e-9);
+
+    const mixed_diff = two_barg.sub(one_bara);
+    try std.testing.expect(mixed_diff.is_delta);
+    try std.testing.expectApproxEqAbs(201325.0, mixed_diff.value, 1e-9);
+    try std.testing.expectApproxEqAbs(2.01325, _si.bar.fromCanonicalValue(mixed_diff.value, mixed_diff.is_delta), 1e-9);
+
+    const reverse_mixed_diff = abs_b.sub(one_barg);
+    try std.testing.expect(reverse_mixed_diff.is_delta);
+    try std.testing.expectApproxEqAbs(-1325.0, reverse_mixed_diff.value, 1e-9);
+    try std.testing.expectApproxEqAbs(-0.01325, _si.bar.fromCanonicalValue(reverse_mixed_diff.value, reverse_mixed_diff.is_delta), 1e-9);
 }
 
 test "context-scoped constants do not leak across contexts" {

@@ -165,7 +165,7 @@ pub const Binary = struct {
                     return .{ .number = left.number / right.number };
                 }
                 if (both_quant) {
-                    if (right.display_quantity.value == 0) return RuntimeError.DivisionByZero;
+                    if (right.display_quantity.canonicalValue() == 0) return RuntimeError.DivisionByZero;
                     const dq = try rt.divDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
@@ -212,8 +212,8 @@ pub const Binary = struct {
                     return .{ .boolean = r };
                 }
                 if (both_quant and Dimension.eql(left.display_quantity.dim, right.display_quantity.dim)) {
-                    const a = left.display_quantity.value;
-                    const b = right.display_quantity.value;
+                    const a = left.display_quantity.canonicalValue();
+                    const b = right.display_quantity.canonicalValue();
                     const r = switch (self.operator.type) {
                         .Greater => a > b,
                         .GreaterEqual => a >= b,
@@ -263,7 +263,7 @@ pub const Unit = struct {
             .unit_expr => |ue| {
                 if (ue.exponent.eqlInt(1)) {
                     const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
-                    canonical_value = u.toCanonical(num);
+                    canonical_value = u.toCanonicalValue(num, false);
                 } else {
                     canonical_value = num * unit_dq.value;
                 }
@@ -275,18 +275,20 @@ pub const Unit = struct {
 
         const fallback = try self.unit_expr.toUnitString(allocator);
         defer allocator.free(fallback);
-        const normalized_unit = try Format.normalizeUnitString(
-            allocator,
-            unit_dq.dim,
-            fallback,
-            SiRegistry,
-        );
+        const normalized_unit = switch (self.unit_expr.*) {
+            .unit_expr => |ue| if (ue.exponent.eqlInt(1))
+                try std.fmt.allocPrint(allocator, "{s}", .{ue.name})
+            else
+                try Format.normalizeUnitString(allocator, unit_dq.dim, fallback, SiRegistry),
+            else => try Format.normalizeUnitString(allocator, unit_dq.dim, fallback, SiRegistry),
+        };
         return LiteralValue{ .display_quantity = DisplayQuantity{
             .value = canonical_value,
             .dim = unit_dq.dim,
             .unit = normalized_unit,
             .mode = .none,
             .is_delta = false,
+            .value_space = .canonical,
         } };
     }
 };
@@ -326,32 +328,39 @@ pub const Display = struct {
             return RuntimeError.InvalidOperands;
         }
 
+        const source_canonical = dq.canonicalValue();
+
         // Convert canonical value to the requested unit.
         // - For simple unit expressions (single unit, exponent 1), use the unit's affine-aware fromCanonical().
         // - Otherwise, divide by multiplicative conversion factor.
         var converted_value: f64 = undefined;
+        var output_unit = target.unit;
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
                 if (ue.exponent.eqlInt(1)) {
                     const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
-                    converted_value = u.fromCanonical(dq.value);
+                    converted_value = u.fromCanonicalValue(source_canonical, dq.is_delta);
+                    if (dq.is_delta and (std.mem.eql(u8, ue.name, "bar") or std.mem.eql(u8, ue.name, "bara") or std.mem.eql(u8, ue.name, "barg"))) {
+                        output_unit = "bar";
+                    }
                 } else {
-                    converted_value = dq.value / target.value;
+                    converted_value = source_canonical / target.value;
                 }
             },
             else => {
-                converted_value = dq.value / target.value;
+                converted_value = source_canonical / target.value;
             },
         }
 
         // Printing will use the stored value directly with the chosen unit symbol and mode.
-        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{target.unit});
+        const unit_copy = try std.fmt.allocPrint(allocator, "{s}", .{output_unit});
         return LiteralValue{ .display_quantity = rt.DisplayQuantity{
             .value = converted_value,
             .dim = dq.dim,
             .unit = unit_copy,
             .mode = self.mode orelse .none,
             .is_delta = dq.is_delta,
+            .value_space = .display,
         } };
     }
 };
@@ -417,6 +426,7 @@ pub const UnitExpr = struct {
                 .unit = try self.toString(allocator),
                 .mode = .none,
                 .is_delta = false,
+                .value_space = .canonical,
             },
         };
     }
@@ -483,6 +493,7 @@ pub const CompoundUnit = struct {
                 .unit = unit_copy,
                 .mode = .none,
                 .is_delta = false,
+                .value_space = .canonical,
             },
         };
     }
@@ -562,7 +573,7 @@ fn isEqual(left: LiteralValue, right: LiteralValue) bool {
         .number => |ln| right.number == ln,
         .string => |ls| std.mem.eql(u8, ls, right.string),
         .boolean => |lb| right.boolean == lb,
-        .display_quantity => |lq| Dimension.eql(lq.dim, right.display_quantity.dim) and (lq.value == right.display_quantity.value),
+        .display_quantity => |lq| Dimension.eql(lq.dim, right.display_quantity.dim) and (lq.canonicalValue() == right.display_quantity.canonicalValue()),
         else => unreachable,
     };
 }

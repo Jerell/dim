@@ -14,12 +14,22 @@ pub const Unit = struct {
         return self.offset != 0.0;
     }
 
-    pub fn toCanonical(self: Unit, v: f64) f64 {
+    pub fn toCanonicalValue(self: Unit, v: f64, is_delta: bool) f64 {
+        if (is_delta) return v * self.scale;
         return (v + self.offset) * self.scale;
     }
 
-    pub fn fromCanonical(self: Unit, v: f64) f64 {
+    pub fn toCanonical(self: Unit, v: f64) f64 {
+        return self.toCanonicalValue(v, false);
+    }
+
+    pub fn fromCanonicalValue(self: Unit, v: f64, is_delta: bool) f64 {
+        if (is_delta) return v / self.scale;
         return v / self.scale - self.offset;
+    }
+
+    pub fn fromCanonical(self: Unit, v: f64) f64 {
+        return self.fromCanonicalValue(v, false);
     }
 
     pub fn from(comptime self: Unit, v: f64) Quantity(self.dim) {
@@ -31,7 +41,7 @@ pub const Unit = struct {
         if (!Dimension.eql(self.dim, @TypeOf(q).dim)) {
             @compileError("Unit dimension does not match Quantity dimension");
         }
-        return self.fromCanonical(q.value);
+        return self.fromCanonicalValue(q.value, q.is_delta);
     }
 
     pub fn mul(self: Unit, other: Unit, symbol: []const u8) Unit {

@@ -150,7 +150,7 @@ You can compile the library to a WASM module and call it from JavaScript in the 
 ### Build
 
 ```bash
-zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall
+zig build wasm -Doptimize=ReleaseSmall
 # => zig-out/bin/dim_wasm.wasm
 ```
 

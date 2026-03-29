@@ -1,5 +1,6 @@
 const std = @import("std");
 const Dimension = @import("dimension.zig").Dimension;
+const Rational = @import("rational.zig").Rational;
 const UnitRegistry = @import("unit.zig").UnitRegistry;
 const Unit = @import("unit.zig").Unit;
 const Format = @import("format.zig");
@@ -20,28 +21,7 @@ fn quantityDim(comptime T: type) Dimension {
 }
 
 fn isTemperatureDim(comptime D: Dimension) bool {
-    return D.L == 0 and D.M == 0 and D.T == 0 and D.I == 0 and D.Th == 1 and D.N == 0 and D.J == 0;
-}
-
-fn powDimFloat(comptime D: Dimension, comptime exp: f64) Dimension {
-    const eps: f64 = 1e-9;
-    const to_i32 = struct {
-        fn call(x: f64) i32 {
-            const r = @round(x);
-            if (@abs(x - r) > eps) @compileError("quantity.pow: fractional exponent produces non-integer dimension exponents");
-            return @as(i32, @intFromFloat(r));
-        }
-    }.call;
-
-    const new_L = to_i32(@as(f64, @floatFromInt(D.L)) * exp);
-    const new_M = to_i32(@as(f64, @floatFromInt(D.M)) * exp);
-    const new_T = to_i32(@as(f64, @floatFromInt(D.T)) * exp);
-    const new_I = to_i32(@as(f64, @floatFromInt(D.I)) * exp);
-    const new_Th = to_i32(@as(f64, @floatFromInt(D.Th)) * exp);
-    const new_N = to_i32(@as(f64, @floatFromInt(D.N)) * exp);
-    const new_J = to_i32(@as(f64, @floatFromInt(D.J)) * exp);
-
-    return Dimension.init(new_L, new_M, new_T, new_I, new_Th, new_N, new_J);
+    return D.L.eqlInt(0) and D.M.eqlInt(0) and D.T.eqlInt(0) and D.I.eqlInt(0) and D.Th.eqlInt(1) and D.N.eqlInt(0) and D.J.eqlInt(0);
 }
 
 pub fn Quantity(comptime Dim: Dimension) type {
@@ -178,35 +158,23 @@ pub fn Quantity(comptime Dim: Dimension) type {
             return .{ .value = self.value / k };
         }
 
-        /// Raise this quantity to a compile-time exponent. Supports integer and
-        /// floating exponents. For floating exponents, the resulting dimension
-        /// exponents must be integers (e.g., (L^2)^0.5 -> L).
+        pub fn powInt(self: Quantity(Dim), comptime exponent: i32) Quantity(Dimension.mulByInt(Dim, exponent)) {
+            return .{ .value = std.math.pow(f64, self.value, @as(f64, @floatFromInt(exponent))), .is_delta = false };
+        }
+
+        pub fn powRational(self: Quantity(Dim), comptime exponent: Rational) Quantity(Dimension.mulByRational(Dim, exponent)) {
+            return .{ .value = std.math.pow(f64, self.value, exponent.toF64()), .is_delta = false };
+        }
+
         pub fn pow(self: Quantity(Dim), comptime exponent: anytype) Quantity(blk: {
-            const TI = @typeInfo(@TypeOf(exponent));
-            switch (TI) {
-                .Int, .ComptimeInt => {
-                    const e: i32 = @as(i32, @intCast(exponent));
-                    break :blk Dimension.pow(Dim, e);
-                },
-                .Float, .ComptimeFloat => {
-                    const e: f64 = @as(f64, exponent);
-                    break :blk powDimFloat(Dim, e);
-                },
-                else => @compileError("Quantity.pow: exponent must be int or float and known at comptime"),
+            const ti = @typeInfo(@TypeOf(exponent));
+            switch (ti) {
+                .Int, .ComptimeInt => break :blk Dimension.mulByInt(Dim, @as(i32, @intCast(exponent))),
+                else => @compileError("Quantity.pow only supports integer exponents; use powRational for rational dimensions"),
             }
         }) {
-            const TI = @typeInfo(@TypeOf(exponent));
-            switch (TI) {
-                .Int, .ComptimeInt => {
-                    const e: i32 = @as(i32, @intCast(exponent));
-                    return .{ .value = std.math.pow(f64, self.value, @as(f64, @floatFromInt(e))), .is_delta = false };
-                },
-                .Float, .ComptimeFloat => {
-                    const e: f64 = @as(f64, exponent);
-                    return .{ .value = std.math.pow(f64, self.value, e), .is_delta = false };
-                },
-                else => unreachable,
-            }
+            const e: i32 = @as(i32, @intCast(exponent));
+            return self.powInt(e);
         }
     };
 }

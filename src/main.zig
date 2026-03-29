@@ -4,6 +4,8 @@ const Io = @import("./io.zig").Io;
 const Scanner = dim.Scanner;
 const Parser = dim.Parser;
 
+const TestError = error{ParseFailed};
+
 pub fn main() !void {
     var io = Io.init();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
@@ -77,6 +79,26 @@ fn runStdin(io: *Io, allocator: std.mem.Allocator) !void {
         if (trimmed.len == 0) continue;
         try run(io, allocator, trimmed);
     }
+}
+
+fn evalTestExpr(allocator: std.mem.Allocator, line: []const u8) (TestError || dim.RuntimeError || error{OutOfMemory})!dim.LiteralValue {
+    var scanner = try Scanner.init(allocator, null, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, null);
+    const maybe_expr = parser.parse();
+    if (parser.hadError or maybe_expr == null) return error.ParseFailed;
+
+    return maybe_expr.?.evaluate(allocator);
+}
+
+fn parseFails(allocator: std.mem.Allocator, line: []const u8) !bool {
+    var scanner = try Scanner.init(allocator, null, line);
+    const tokens = try scanner.scanTokens();
+
+    var parser = Parser.init(allocator, tokens, null);
+    const maybe_expr = parser.parse();
+    return parser.hadError or maybe_expr == null;
 }
 
 test "unicode middle dot as multiplication for numbers" {
@@ -390,6 +412,120 @@ test "fractional exponent on squared quantity works (sqrt area -> length)" {
     }
 }
 
+test "fractional exponent on length yields rational dimension output" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const eval_result = try evalTestExpr(allocator, "(9 m)^0.5");
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(3.0, dq.value, 1e-9);
+            try std.testing.expect(dim.Rational.eql(dq.dim.L, dim.Rational.init(1, 2)));
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "m^(1/2)"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "fractional exponent preserves signed rational output for compound dimensions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const eval_result = try evalTestExpr(allocator, "(1 m/s)^0.5");
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "m^(1/2)*s^(-1/2)"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "fractional exponent with numerator greater than one formats canonically" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const eval_result = try evalTestExpr(allocator, "(1 m)^1.5");
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "m^(3/2)"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "fractional unit literal normalizes to signed exponents" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const eval_result = try evalTestExpr(allocator, "1 Pa^0.5");
+    switch (eval_result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "kg^(1/2)*m^(-1/2)*s^(-1)"));
+            try std.testing.expect(dim.Rational.eql(dq.dim.M, dim.Rational.init(1, 2)));
+            try std.testing.expect(dim.Rational.eql(dq.dim.L, dim.Rational.init(-1, 2)));
+            try std.testing.expect(dq.dim.T.eqlInt(-1));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "rational exponents round-trip through as conversions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const sqrt_meter = try evalTestExpr(allocator, "1 m^(1/2) as m^(1/2)");
+    switch (sqrt_meter) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "m^(1/2)"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+
+    const inv_sqrt_second = try evalTestExpr(allocator, "1 s^(-1/2) as s^(-1/2)");
+    switch (inv_sqrt_second) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(1.0, dq.value, 1e-9);
+            try std.testing.expect(std.mem.eql(u8, dq.unit, "s^(-1/2)"));
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
+test "non-literal dimensional exponent expressions are rejected" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try std.testing.expectError(dim.RuntimeError.NonRationalDimensionalExponent, evalTestExpr(allocator, "(1 m)^((1/2)+0)"));
+}
+
+test "affine units reject fractional exponents" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try std.testing.expectError(dim.RuntimeError.AffineUnitExponentiation, evalTestExpr(allocator, "1 C^0.5"));
+    try std.testing.expectError(dim.RuntimeError.AffineUnitExponentiation, evalTestExpr(allocator, "1 C^(1/2)"));
+}
+
+test "unit-expression grammar rejects non-rational exponents" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try std.testing.expect(try parseFails(allocator, "1 m as m^pi"));
+    try std.testing.expect(try parseFails(allocator, "1 m as m^(sqrt(2))"));
+}
+
 test "unit conversion C to F" {
     var io = Io.init();
     defer io.flushAll() catch |e| io.eprintf("flush error: {s}\n", .{@errorName(e)}) catch {};
@@ -539,8 +675,8 @@ test "mixing superscript and caret notation (kg/m³ + kg/m^3)" {
         .display_quantity => |dq| {
             try std.testing.expectApproxEqAbs(2.0, dq.value, 1e-9);
             // Both should have the same dimension (density: M/L³)
-            try std.testing.expect(dq.dim.M == 1);
-            try std.testing.expect(dq.dim.L == -3);
+            try std.testing.expect(dq.dim.M.eqlInt(1));
+            try std.testing.expect(dq.dim.L.eqlInt(-3));
         },
         else => std.debug.panic("expected display_quantity result", .{}),
     }

@@ -5,6 +5,7 @@ Generated on March 28, 2026.
 This document explains:
 
 - what changed in the new WASM ABI
+- what changed again for rational-dimension support
 - what was migrated in `mor05`
 - the benchmark results for the new ABI
 - how to update other projects in `/Users/jerell/Repos` that still use the legacy string-first wrapper
@@ -38,6 +39,14 @@ The new ABI is context-based and structured:
 - `dim_free`
 
 The Zig side now keeps runtime constants inside `DimContext` rather than relying on a single process-global constant registry for WASM consumers.
+
+Rational exponent support adds one more ABI-level change on top of that structured surface:
+
+- dimension components are no longer exposed as plain `int32`
+- each component is now exposed as an exact `{ num, den }` pair
+- integer dimensions are encoded as `n/1`
+
+That means ABI V2 consumers that already migrated off the legacy string API may still need a follow-up wrapper update for rational dimensions.
 
 ## Why This Matters
 
@@ -81,6 +90,11 @@ Those wrappers are useful during migration, but new call sites should prefer the
 `dim_ctx_eval` returns a tagged structured result instead of a formatted string. The JS wrappers turn that into:
 
 ```ts
+type DimRational = {
+  num: number;
+  den: number;
+};
+
 type DimEvalResult =
   | { kind: "number"; value: number }
   | { kind: "boolean"; value: boolean }
@@ -90,13 +104,13 @@ type DimEvalResult =
       value: number;
       unit: string;
       dim: {
-        L: number;
-        M: number;
-        T: number;
-        I: number;
-        Th: number;
-        N: number;
-        J: number;
+        L: DimRational;
+        M: DimRational;
+        T: DimRational;
+        I: DimRational;
+        Th: DimRational;
+        N: DimRational;
+        J: DimRational;
       };
       isDelta: boolean;
       mode: "none" | "auto" | "scientific" | "engineering";
@@ -106,9 +120,62 @@ type DimEvalResult =
 
 That removes the need for downstream code to recover numbers and units by splitting formatted display strings.
 
+## Rational Dimension Layout
+
+The current structured ABI uses flat numerator/denominator pairs inside the result structs.
+
+For `DimEvalResult` in wasm32 memory:
+
+- bytes `0..31`: existing kind/bool/mode/is_delta/number_value/quantity_value fields
+- bytes `32..87`: seven dimension pairs in `L, M, T, I, Th, N, J` order
+- bytes `88..103`: string/unit pointers and lengths
+
+For `DimQuantityResult` in wasm32 memory:
+
+- bytes `0..15`: existing mode/is_delta/value fields
+- bytes `16..71`: seven dimension pairs in `L, M, T, I, Th, N, J` order
+- bytes `72..79`: unit pointer and length
+
+Current wasm32 wrapper constants should be:
+
+- `EVAL_RESULT_SIZE = 104`
+- `QUANTITY_RESULT_SIZE = 80`
+
+Suggested TS helpers:
+
+```ts
+type DimRational = { num: number; den: number };
+
+function readRational(dv: DataView, offset: number): DimRational {
+  return {
+    num: dv.getInt32(offset, true),
+    den: dv.getUint32(offset + 4, true),
+  };
+}
+
+function readDimensions(dv: DataView, offset: number) {
+  return {
+    L: readRational(dv, offset + 0),
+    M: readRational(dv, offset + 8),
+    T: readRational(dv, offset + 16),
+    I: readRational(dv, offset + 24),
+    Th: readRational(dv, offset + 32),
+    N: readRational(dv, offset + 40),
+    J: readRational(dv, offset + 48),
+  };
+}
+```
+
+If a caller only cares about integer dimensions, it should explicitly check `den === 1` rather than assuming that from the ABI.
+
 ## Migration Summary
 
 `mor05` is the reference migration for this rollout.
+
+For rational dimensions, `mor05` should now be treated as:
+
+- the reference V2 wrapper structure
+- plus a required follow-up update to its dimension decoding/types
 
 ### Wrapper Changes
 
@@ -128,6 +195,13 @@ These wrappers now:
 - preserve a minimal WASI shim because the current Zig-generated WASM still imports `wasi_snapshot_preview1`
 - normalize returned/allocated wasm32 pointers with `>>> 0`
 - keep legacy helper functions as compatibility wrappers
+
+With rational-dimension support, these wrappers also need to:
+
+- change `DimDimension` from numeric fields to `{ num, den }` fields
+- update `EVAL_RESULT_SIZE` from `80` to `104`
+- update `QUANTITY_RESULT_SIZE` from `56` to `80`
+- read dimension pairs with 8-byte strides instead of 4-byte strides
 
 ### Call-Site Changes
 
@@ -222,6 +296,12 @@ Key things to carry over:
 - syntax normalization for `·`, `⋅`, `²`, `³`, and scientific notation expansion
 - compatibility wrappers layered on top of the new structured functions
 
+If a project is already on ABI V2, skip the old string-wrapper migration and just apply the rational-dimension wrapper update:
+
+- change the dimension type shape
+- change the struct sizes
+- change the field offsets used by `readEvalResult(...)` and `readQuantityResult(...)`
+
 ### 2. Keep the WASI Shim for Now
 
 Even the V2 artifact currently still imports `wasi_snapshot_preview1`.
@@ -285,6 +365,7 @@ switch to:
 Good migration tests include:
 
 - structured result checks for `evalStructured`
+- rational dimension checks such as `(9 m)^0.5 -> L = 1/2`
 - direct conversion checks for `convertExpr` and `convertValue`
 - compatibility checks that invalid expressions return `false`
 - batched APIs matching repeated single-call behavior
@@ -340,25 +421,30 @@ The following repos still look like legacy dim consumers and are good next migra
 
 For each repo:
 
-1. Replace the wrapper.
-2. Copy in the new WASM artifact.
-3. Keep the compatibility helpers so existing imports do not all break at once.
-4. Update the highest-volume call sites away from string parsing.
-5. Add batch APIs where loops are obvious.
-6. Run local type checks and the repo’s focused dim-related tests.
+1. Decide whether the repo is still on the legacy string ABI or already on structured ABI V2.
+2. If it is legacy, replace the wrapper first.
+3. If it is already on V2, update the wrapper for rational dimension fields first.
+4. Copy in the new WASM artifact.
+5. Keep the compatibility helpers so existing imports do not all break at once.
+6. Update the highest-volume call sites away from string parsing.
+7. Add batch APIs where loops are obvious.
+8. Run local type checks and the repo’s focused dim-related tests.
 
 If a repo looks very similar to `mor05`, the fastest path is usually:
 
 1. copy the `mor05` wrapper shape
-2. adapt the local file paths for the WASM asset
-3. migrate obvious `split(" ")[0]` and `dim.eval(...)` hot paths
-4. keep legacy helpers temporarily for lower-risk call sites
+2. update the dimension decoding to `{ num, den }` pairs
+3. adapt the local file paths for the WASM asset
+4. migrate obvious `split(" ")[0]` and `dim.eval(...)` hot paths
+5. keep legacy helpers temporarily for lower-risk call sites
 
 ## Known Notes
 
 - ABI V2 is a break-and-replace WASM/C ABI for consumers.
+- Rational dimension support is a second breaking change within the structured V2 surface.
 - The generated WASM still needs the small WASI shim right now.
 - JS/TS wrappers should normalize wasm32 pointers with `>>> 0`.
+- JS/TS wrappers should treat integer dimensions as `{ num: n, den: 1 }`, not plain numbers.
 - Legacy `eval`-style helpers can still be exposed for compatibility, but they should sit on top of the structured APIs rather than remain the primary path.
 
 ## Reference Files
@@ -379,4 +465,3 @@ Reference migration:
 - `../Pace/mor05/bff/src/services/valueParser.ts`
 - `../Pace/mor05/bff/src/services/unitFormatter.ts`
 - `../Pace/mor05/bff/src/services/snapshot/request-adapter.ts`
-

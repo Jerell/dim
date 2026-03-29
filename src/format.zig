@@ -2,6 +2,7 @@ const std = @import("std");
 const Unit = @import("unit.zig").Unit;
 const UnitRegistry = @import("unit.zig").UnitRegistry;
 const Dimension = @import("dimension.zig").Dimension;
+const Rational = @import("rational.zig").Rational;
 const SiPrefixes = @import("registry/si.zig").Registry.prefixes;
 
 pub const FormatMode = enum { auto, none, scientific, engineering };
@@ -107,319 +108,171 @@ pub fn normalizeUnitString(
     fallback: []const u8,
     reg: UnitRegistry,
 ) ![]u8 {
-    // 1) Prefer a registry unit that matches the full dimension (e.g., m/s, m/s², N)
-    // Prefer canonical symbols (scale == 1.0). If none, still fall back to the first match.
-    var any_match: ?[]const u8 = null;
-    for (reg.units) |u| {
-        if (Dimension.eql(u.dim, dim)) {
-            if (u.scale == 1.0) {
-                return try std.fmt.allocPrint(allocator, "{s}", .{u.symbol});
-            }
-            if (any_match == null) any_match = u.symbol;
-        }
-    }
-    if (any_match) |sym| {
+    _ = fallback;
+
+    if (findExactDimensionSymbol(reg, dim)) |sym| {
         return try std.fmt.allocPrint(allocator, "{s}", .{sym});
     }
 
-    // 2) Build a canonical SI expression from the dimension, with a simple greedy
-    //    factoring of one derived unit (if it reduces complexity), then base units.
-    var rem = dim;
+    const base = detectBaseSymbols(reg);
+    if (dim.hasFractional()) {
+        return formatSignedProduct(allocator, dim, base);
+    }
 
-    // Detect base units from registry by looking for scale==1.0 and basis dimensions.
-    var baseL: ?[]const u8 = null;
-    var baseM: ?[]const u8 = null;
-    var baseT: ?[]const u8 = null;
-    var baseI: ?[]const u8 = null;
-    var baseTh: ?[]const u8 = null;
-    var baseN: ?[]const u8 = null;
-    var baseJ: ?[]const u8 = null;
+    const numerator = positiveIntegerPart(dim);
+    const denominator = negativeIntegerPart(dim);
 
-    const isBasis = struct {
-        fn call(d: Dimension, l: i32, m: i32, t: i32, i: i32, th: i32, n: i32, j: i32) bool {
-            return d.L == l and d.M == m and d.T == t and d.I == i and d.Th == th and d.N == n and d.J == j;
-        }
-    }.call;
+    const numerator_str = try formatIntegerPart(allocator, numerator, base, reg);
+    defer if (numerator_str) |s| allocator.free(s);
+    const denominator_str = try formatIntegerPart(allocator, denominator, base, reg);
+    defer if (denominator_str) |s| allocator.free(s);
 
+    if (numerator_str == null and denominator_str == null) {
+        return try std.fmt.allocPrint(allocator, "1", .{});
+    }
+    if (denominator_str == null) {
+        return try std.fmt.allocPrint(allocator, "{s}", .{numerator_str.?});
+    }
+    if (numerator_str == null) {
+        return try std.fmt.allocPrint(allocator, "1/{s}", .{denominator_str.?});
+    }
+    return try std.fmt.allocPrint(allocator, "{s}/{s}", .{ numerator_str.?, denominator_str.? });
+}
+
+const BaseSymbols = struct {
+    L: []const u8 = "m",
+    M: []const u8 = "kg",
+    T: []const u8 = "s",
+    I: []const u8 = "A",
+    Th: []const u8 = "K",
+    N: []const u8 = "mol",
+    J: []const u8 = "cd",
+};
+
+fn detectBaseSymbols(reg: UnitRegistry) BaseSymbols {
+    var base = BaseSymbols{};
     for (reg.units) |u| {
         if (u.scale != 1.0) continue;
         const d = u.dim;
-        if (baseL == null and isBasis(d, 1, 0, 0, 0, 0, 0, 0)) baseL = u.symbol;
-        if (baseM == null and isBasis(d, 0, 1, 0, 0, 0, 0, 0)) baseM = u.symbol;
-        if (baseT == null and isBasis(d, 0, 0, 1, 0, 0, 0, 0)) baseT = u.symbol;
-        if (baseI == null and isBasis(d, 0, 0, 0, 1, 0, 0, 0)) baseI = u.symbol;
-        if (baseTh == null and isBasis(d, 0, 0, 0, 0, 1, 0, 0)) baseTh = u.symbol;
-        if (baseN == null and isBasis(d, 0, 0, 0, 0, 0, 1, 0)) baseN = u.symbol;
-        if (baseJ == null and isBasis(d, 0, 0, 0, 0, 0, 0, 1)) baseJ = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(1, 0, 0, 0, 0, 0, 0))) base.L = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 1, 0, 0, 0, 0, 0))) base.M = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 0, 1, 0, 0, 0, 0))) base.T = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 0, 0, 1, 0, 0, 0))) base.I = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 0, 0, 0, 1, 0, 0))) base.Th = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 0, 0, 0, 0, 1, 0))) base.N = u.symbol;
+        if (Dimension.eql(d, Dimension.initInts(0, 0, 0, 0, 0, 0, 1))) base.J = u.symbol;
     }
+    return base;
+}
 
-    // Try picking one non-base derived unit that reduces complexity (N, J, W, Pa, m/s, m/s², etc.)
-    const absI32 = struct {
-        fn call(x: i32) i32 {
-            return if (x >= 0) x else -x;
-        }
-    }.call;
-    const complexitySum = struct {
-        fn call(d: Dimension) i32 {
-            return absI32(d.L) + absI32(d.M) + absI32(d.T) + absI32(d.I) + absI32(d.Th) + absI32(d.N) + absI32(d.J);
-        }
-    }.call;
-
-    // Check if subtracting a derived unit creates an invalid remainder.
-    // The remainder should be "between" zero and the original for each component:
-    // - Same sign as original (or zero)
-    // - Magnitude not exceeding original
-    // This prevents picking units that cause sign flips or overshoot.
-    const isInvalidRemainder = struct {
-        fn checkComponent(orig: i32, r: i32) bool {
-            if (orig == 0) return r != 0; // can't introduce new dimensions
-            if (orig > 0) return r < 0 or r > orig; // must stay in [0, orig]
-            // orig < 0
-            return r > 0 or r < orig; // must stay in [orig, 0]
-        }
-        fn call(original: Dimension, remainder: Dimension) bool {
-            return checkComponent(original.L, remainder.L) or
-                checkComponent(original.M, remainder.M) or
-                checkComponent(original.T, remainder.T) or
-                checkComponent(original.I, remainder.I) or
-                checkComponent(original.Th, remainder.Th) or
-                checkComponent(original.N, remainder.N) or
-                checkComponent(original.J, remainder.J);
-        }
-    }.call;
-
-    var picked: ?[]const u8 = null;
-    var best_reduction: i32 = 0;
-    var best_priority: i32 = 1000;
-    const preferred_symbols = [_][]const u8{ "J", "N", "W", "Pa", "m/s²", "m/s", "m²", "m³" };
-    const getPriority = struct {
-        fn call(sym: []const u8) i32 {
-            var i: usize = 0;
-            while (i < preferred_symbols.len) : (i += 1) {
-                if (std.mem.eql(u8, sym, preferred_symbols[i])) return @as(i32, @intCast(i));
-            }
-            return 999;
-        }
-    }.call;
-
-    // Check if a dimension is dimensionless (all components zero)
-    const isDimensionless = struct {
-        fn call(d: Dimension) bool {
-            return d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0;
-        }
-    }.call;
-
-    const curr_c = complexitySum(rem);
+fn findExactDimensionSymbol(reg: UnitRegistry, dim: Dimension) ?[]const u8 {
+    var any_match: ?[]const u8 = null;
     for (reg.units) |u| {
-        if (u.scale != 1.0) continue; // avoid picking cm, km, etc.
-        // Skip pure base units (basis vectors)
-        const d = u.dim;
-        const is_base = (d.L == 1 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
-            (d.L == 0 and d.M == 1 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
-            (d.L == 0 and d.M == 0 and d.T == 1 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 0) or
-            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 1 and d.Th == 0 and d.N == 0 and d.J == 0) or
-            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 1 and d.N == 0 and d.J == 0) or
-            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 1 and d.J == 0) or
-            (d.L == 0 and d.M == 0 and d.T == 0 and d.I == 0 and d.Th == 0 and d.N == 0 and d.J == 1);
-        if (is_base) continue;
+        if (!Dimension.eql(u.dim, dim)) continue;
+        if (u.scale == 1.0) return u.symbol;
+        if (any_match == null) any_match = u.symbol;
+    }
+    return any_match;
+}
 
-        const d_after = Dimension.sub(rem, d);
+fn positiveIntegerPart(dim: Dimension) Dimension {
+    return Dimension.initInts(
+        positiveInt(dim.L),
+        positiveInt(dim.M),
+        positiveInt(dim.T),
+        positiveInt(dim.I),
+        positiveInt(dim.Th),
+        positiveInt(dim.N),
+        positiveInt(dim.J),
+    );
+}
 
-        // Reject if this creates an invalid remainder (sign flip or overshoot)
-        if (isInvalidRemainder(rem, d_after)) continue;
+fn negativeIntegerPart(dim: Dimension) Dimension {
+    return Dimension.initInts(
+        negativeMagnitudeInt(dim.L),
+        negativeMagnitudeInt(dim.M),
+        negativeMagnitudeInt(dim.T),
+        negativeMagnitudeInt(dim.I),
+        negativeMagnitudeInt(dim.Th),
+        negativeMagnitudeInt(dim.N),
+        negativeMagnitudeInt(dim.J),
+    );
+}
 
-        // Only pick this derived unit if the remainder is dimensionless.
-        // This prevents ugly composites like "m/s*m²" for volumetric flow rate.
-        if (!isDimensionless(d_after)) continue;
+fn positiveInt(r: Rational) i32 {
+    const value = r.toInt().?;
+    return if (value > 0) value else 0;
+}
 
-        const reduction = curr_c - complexitySum(d_after);
-        if (reduction <= 0) continue;
+fn negativeMagnitudeInt(r: Rational) i32 {
+    const value = r.toInt().?;
+    return if (value < 0) -value else 0;
+}
 
-        const pr = getPriority(u.symbol);
-        if (pr < best_priority or (pr == best_priority and reduction > best_reduction)) {
-            best_priority = pr;
-            best_reduction = reduction;
-            picked = u.symbol;
+fn formatIntegerPart(
+    allocator: std.mem.Allocator,
+    dim: Dimension,
+    base: BaseSymbols,
+    reg: UnitRegistry,
+) !?[]u8 {
+    if (dim.isDimensionless()) return null;
+    for (reg.units) |u| {
+        if (u.scale == 1.0 and Dimension.eql(u.dim, dim)) {
+            return try std.fmt.allocPrint(allocator, "{s}", .{u.symbol});
         }
     }
 
-    // If we picked a derived unit, subtract its dimension from the remainder now
-    if (picked) |sym_pick| {
-        for (reg.units) |u| {
-            if (u.scale == 1.0 and std.mem.eql(u8, u.symbol, sym_pick)) {
-                rem = Dimension.sub(rem, u.dim);
-                break;
-            }
-        }
-    }
-
-    // Compose result
     var buf = std.ArrayListUnmanaged(u8){};
     defer buf.deinit(allocator);
     var w = buf.writer(allocator);
-
     var wrote_any = false;
-    if (picked) |sym| {
-        try w.print("{s}", .{sym});
-        wrote_any = true;
-    }
 
-    // If the remaining dimension matches a single registry unit exactly,
-    // emit that symbol directly (e.g., rem = Area -> "m²").
-    var handled_rem = false;
-    for (reg.units) |u| {
-        if (u.scale != 1.0) continue;
-        if (Dimension.eql(u.dim, rem)) {
-            if (wrote_any) try w.writeAll("*");
-            try w.writeAll(u.symbol);
-            wrote_any = true;
-            handled_rem = true;
-            break;
-        }
-    }
+    try appendIntegerComponent(&w, &wrote_any, base.M, dim.M.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.L, dim.L.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.T, dim.T.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.I, dim.I.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.Th, dim.Th.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.N, dim.N.toInt().?);
+    try appendIntegerComponent(&w, &wrote_any, base.J, dim.J.toInt().?);
 
-    // Try to match the positive portion (numerator) to a compound unit like m³, m²
-    // This gives cleaner output like "m³/s" instead of "m^3/s"
-    if (!handled_rem) {
-        const pos_dim = Dimension.init(
-            if (rem.L > 0) rem.L else 0,
-            if (rem.M > 0) rem.M else 0,
-            if (rem.T > 0) rem.T else 0,
-            if (rem.I > 0) rem.I else 0,
-            if (rem.Th > 0) rem.Th else 0,
-            if (rem.N > 0) rem.N else 0,
-            if (rem.J > 0) rem.J else 0,
-        );
-        for (reg.units) |u| {
-            if (u.scale != 1.0) continue;
-            if (Dimension.eql(u.dim, pos_dim)) {
-                if (wrote_any) try w.writeAll("*");
-                try w.writeAll(u.symbol);
-                wrote_any = true;
-                // Update rem to only have negative components
-                rem = Dimension.init(
-                    if (rem.L < 0) rem.L else 0,
-                    if (rem.M < 0) rem.M else 0,
-                    if (rem.T < 0) rem.T else 0,
-                    if (rem.I < 0) rem.I else 0,
-                    if (rem.Th < 0) rem.Th else 0,
-                    if (rem.N < 0) rem.N else 0,
-                    if (rem.J < 0) rem.J else 0,
-                );
-                handled_rem = Dimension.eql(rem, Dimension.init(0, 0, 0, 0, 0, 0, 0));
-                break;
-            }
-        }
-    }
+    if (!wrote_any) return null;
+    return try buf.toOwnedSlice(allocator);
+}
 
-    // Emit numerator base units
-    if (!handled_rem and rem.M > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseM orelse "kg");
-        if (rem.M != 1) try w.print("^{d}", .{rem.M});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.L > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseL orelse "m");
-        if (rem.L != 1) try w.print("^{d}", .{rem.L});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.T > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseT orelse "s");
-        if (rem.T != 1) try w.print("^{d}", .{rem.T});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.I > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseI orelse "A");
-        if (rem.I != 1) try w.print("^{d}", .{rem.I});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.Th > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseTh orelse "K");
-        if (rem.Th != 1) try w.print("^{d}", .{rem.Th});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.N > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseN orelse "mol");
-        if (rem.N != 1) try w.print("^{d}", .{rem.N});
-        wrote_any = true;
-    }
-    if (!handled_rem and rem.J > 0) {
-        if (wrote_any) try w.writeAll("*");
-        try w.writeAll(baseJ orelse "cd");
-        if (rem.J != 1) try w.print("^{d}", .{rem.J});
-        wrote_any = true;
-    }
+fn appendIntegerComponent(writer: anytype, wrote_any: *bool, symbol: []const u8, exponent: i32) !void {
+    if (exponent == 0) return;
+    if (wrote_any.*) try writer.writeAll("*");
+    try writer.writeAll(symbol);
+    if (exponent != 1) try writer.print("^{d}", .{exponent});
+    wrote_any.* = true;
+}
 
-    // Emit denominator base units
-    const has_den = (!handled_rem) and ((rem.M < 0) or (rem.L < 0) or (rem.T < 0) or (rem.I < 0) or (rem.Th < 0) or (rem.N < 0) or (rem.J < 0));
-    if (has_den) {
-        if (!wrote_any) {
-            try w.writeAll("1");
-            wrote_any = true;
-        }
-        try w.writeAll("/");
-        var need_sep = false;
-        if (rem.M < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseM orelse "kg");
-            const p = -rem.M;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.L < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseL orelse "m");
-            const p = -rem.L;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.T < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseT orelse "s");
-            const p = -rem.T;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.I < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseI orelse "A");
-            const p = -rem.I;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.Th < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseTh orelse "K");
-            const p = -rem.Th;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.N < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseN orelse "mol");
-            const p = -rem.N;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-        if (rem.J < 0) {
-            if (need_sep) try w.writeAll("*");
-            try w.writeAll(baseJ orelse "cd");
-            const p = -rem.J;
-            if (p != 1) try w.print("^{d}", .{p});
-            need_sep = true;
-        }
-    }
+fn formatSignedProduct(
+    allocator: std.mem.Allocator,
+    dim: Dimension,
+    base: BaseSymbols,
+) ![]u8 {
+    var buf = std.ArrayListUnmanaged(u8){};
+    defer buf.deinit(allocator);
+    var w = buf.writer(allocator);
+    var wrote_any = false;
 
-    if (!wrote_any) {
-        // Dimensionless
-        return try std.fmt.allocPrint(allocator, "{s}", .{fallback});
-    }
+    try appendSignedComponent(&w, &wrote_any, base.M, dim.M);
+    try appendSignedComponent(&w, &wrote_any, base.L, dim.L);
+    try appendSignedComponent(&w, &wrote_any, base.T, dim.T);
+    try appendSignedComponent(&w, &wrote_any, base.I, dim.I);
+    try appendSignedComponent(&w, &wrote_any, base.Th, dim.Th);
+    try appendSignedComponent(&w, &wrote_any, base.N, dim.N);
+    try appendSignedComponent(&w, &wrote_any, base.J, dim.J);
 
+    if (!wrote_any) try w.writeAll("1");
     return buf.toOwnedSlice(allocator);
+}
+
+fn appendSignedComponent(writer: anytype, wrote_any: *bool, symbol: []const u8, exponent: Rational) !void {
+    if (exponent.isZero()) return;
+    if (wrote_any.*) try writer.writeAll("*");
+    try writer.writeAll(symbol);
+    try exponent.formatExponent(writer);
+    wrote_any.* = true;
 }

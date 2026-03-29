@@ -3,6 +3,10 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .wasi,
+    });
 
     // Library module (for Zig consumers)
     const mod = b.addModule("dim", .{
@@ -65,22 +69,29 @@ pub fn build(b: *std.Build) void {
     c_lib.linkLibC();
     b.installArtifact(c_lib);
 
-    // WebAssembly wrapper (exports JS-callable API)
-    if (target.result.cpu.arch == .wasm32) {
-        const wasm_exe = b.addExecutable(.{
-            .name = "dim_wasm",
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/wasm.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "dim", .module = mod },
-                },
-            }),
-        });
-        // No start symbol for WASM; export all symbols to make JS interop easy
-        wasm_exe.entry = .disabled;
-        wasm_exe.rdynamic = true;
-        b.installArtifact(wasm_exe);
-    }
+    // WebAssembly wrapper (exports JS-callable API).
+    // This is a dedicated step so building wasm does not retarget the native CLI/library graph.
+    const wasm_mod = b.addModule("dim_wasm_module", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = wasm_target,
+    });
+    wasm_mod.addImport("dim", wasm_mod);
+
+    const wasm_exe = b.addExecutable(.{
+        .name = "dim_wasm",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm.zig"),
+            .target = wasm_target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "dim", .module = wasm_mod },
+            },
+        }),
+    });
+    wasm_exe.entry = .disabled;
+    wasm_exe.rdynamic = true;
+
+    const install_wasm = b.addInstallArtifact(wasm_exe, .{});
+    const wasm_step = b.step("wasm", "Build the WebAssembly wrapper");
+    wasm_step.dependOn(&install_wasm.step);
 }

@@ -36,13 +36,20 @@ pub const DimEvalResult = extern struct {
     is_delta: u32,
     number_value: f64,
     quantity_value: f64,
-    dim_L: i32,
-    dim_M: i32,
-    dim_T: i32,
-    dim_I: i32,
-    dim_Th: i32,
-    dim_N: i32,
-    dim_J: i32,
+    dim_L_num: i32,
+    dim_L_den: u32,
+    dim_M_num: i32,
+    dim_M_den: u32,
+    dim_T_num: i32,
+    dim_T_den: u32,
+    dim_I_num: i32,
+    dim_I_den: u32,
+    dim_Th_num: i32,
+    dim_Th_den: u32,
+    dim_N_num: i32,
+    dim_N_den: u32,
+    dim_J_num: i32,
+    dim_J_den: u32,
     string_ptr: usize,
     string_len: usize,
     unit_ptr: usize,
@@ -53,13 +60,20 @@ pub const DimQuantityResult = extern struct {
     mode: u32,
     is_delta: u32,
     value: f64,
-    dim_L: i32,
-    dim_M: i32,
-    dim_T: i32,
-    dim_I: i32,
-    dim_Th: i32,
-    dim_N: i32,
-    dim_J: i32,
+    dim_L_num: i32,
+    dim_L_den: u32,
+    dim_M_num: i32,
+    dim_M_den: u32,
+    dim_T_num: i32,
+    dim_T_den: u32,
+    dim_I_num: i32,
+    dim_I_den: u32,
+    dim_Th_num: i32,
+    dim_Th_den: u32,
+    dim_N_num: i32,
+    dim_N_den: u32,
+    dim_J_num: i32,
+    dim_J_den: u32,
     unit_ptr: usize,
     unit_len: usize,
 };
@@ -93,23 +107,29 @@ fn literalDimension(value: dim.LiteralValue) ?dim.Dimension {
     };
 }
 
-fn fillDimensions(
-    dim_value: dim.Dimension,
-    out_L: *i32,
-    out_M: *i32,
-    out_T: *i32,
-    out_I: *i32,
-    out_Th: *i32,
-    out_N: *i32,
-    out_J: *i32,
-) void {
-    out_L.* = dim_value.L;
-    out_M.* = dim_value.M;
-    out_T.* = dim_value.T;
-    out_I.* = dim_value.I;
-    out_Th.* = dim_value.Th;
-    out_N.* = dim_value.N;
-    out_J.* = dim_value.J;
+fn fillDimensionRational(value: dim.Rational, out_num: *i32, out_den: *u32) void {
+    out_num.* = value.num;
+    out_den.* = value.den;
+}
+
+fn fillDimensionsEval(dim_value: dim.Dimension, out: *DimEvalResult) void {
+    fillDimensionRational(dim_value.L, &out.dim_L_num, &out.dim_L_den);
+    fillDimensionRational(dim_value.M, &out.dim_M_num, &out.dim_M_den);
+    fillDimensionRational(dim_value.T, &out.dim_T_num, &out.dim_T_den);
+    fillDimensionRational(dim_value.I, &out.dim_I_num, &out.dim_I_den);
+    fillDimensionRational(dim_value.Th, &out.dim_Th_num, &out.dim_Th_den);
+    fillDimensionRational(dim_value.N, &out.dim_N_num, &out.dim_N_den);
+    fillDimensionRational(dim_value.J, &out.dim_J_num, &out.dim_J_den);
+}
+
+fn fillDimensionsQuantity(dim_value: dim.Dimension, out: *DimQuantityResult) void {
+    fillDimensionRational(dim_value.L, &out.dim_L_num, &out.dim_L_den);
+    fillDimensionRational(dim_value.M, &out.dim_M_num, &out.dim_M_den);
+    fillDimensionRational(dim_value.T, &out.dim_T_num, &out.dim_T_den);
+    fillDimensionRational(dim_value.I, &out.dim_I_num, &out.dim_I_den);
+    fillDimensionRational(dim_value.Th, &out.dim_Th_num, &out.dim_Th_den);
+    fillDimensionRational(dim_value.N, &out.dim_N_num, &out.dim_N_den);
+    fillDimensionRational(dim_value.J, &out.dim_J_num, &out.dim_J_den);
 }
 
 fn fillQuantityResult(out: *DimQuantityResult, dq: dim.DisplayQuantity) void {
@@ -117,7 +137,7 @@ fn fillQuantityResult(out: *DimQuantityResult, dq: dim.DisplayQuantity) void {
     out.mode = formatModeValue(dq.mode);
     out.is_delta = if (dq.is_delta) 1 else 0;
     out.value = dq.value;
-    fillDimensions(dq.dim, &out.dim_L, &out.dim_M, &out.dim_T, &out.dim_I, &out.dim_Th, &out.dim_N, &out.dim_J);
+    fillDimensionsQuantity(dq.dim, out);
     out.unit_ptr = @intFromPtr(dq.unit.ptr);
     out.unit_len = dq.unit.len;
 }
@@ -143,7 +163,7 @@ fn fillEvalResult(out: *DimEvalResult, value: dim.LiteralValue) void {
             out.mode = formatModeValue(dq.mode);
             out.is_delta = if (dq.is_delta) 1 else 0;
             out.quantity_value = dq.value;
-            fillDimensions(dq.dim, &out.dim_L, &out.dim_M, &out.dim_T, &out.dim_I, &out.dim_Th, &out.dim_N, &out.dim_J);
+            fillDimensionsEval(dq.dim, out);
             out.unit_ptr = @intFromPtr(dq.unit.ptr);
             out.unit_len = dq.unit.len;
         },
@@ -442,7 +462,43 @@ test "dim_ctx_eval returns structured quantity result" {
     try std.testing.expectEqual(statusCode(.ok), rc);
     try std.testing.expectEqual(@as(u32, @intFromEnum(DimValueKind.quantity)), result.kind);
     try std.testing.expectApproxEqAbs(6.0, result.quantity_value, 1e-9);
+    try std.testing.expectEqual(@as(i32, 2), result.dim_L_num);
+    try std.testing.expectEqual(@as(u32, 1), result.dim_L_den);
+    try std.testing.expectEqual(@as(i32, -2), result.dim_T_num);
+    try std.testing.expectEqual(@as(u32, 1), result.dim_T_den);
     try std.testing.expectEqualStrings("kJ/kg", (@as([*]const u8, @ptrFromInt(result.unit_ptr)))[0..result.unit_len]);
+}
+
+test "dim_ctx_eval exposes rational dimensions directly" {
+    var ctx = dim.DimContext.init(std.testing.allocator);
+    defer ctx.deinit();
+
+    var result = std.mem.zeroes(DimEvalResult);
+    const rc = dim_ctx_eval(&ctx, "(9 m)^0.5".ptr, "(9 m)^0.5".len, &result);
+    defer freeEvalResult(&result);
+
+    try std.testing.expectEqual(statusCode(.ok), rc);
+    try std.testing.expectEqual(@as(i32, 1), result.dim_L_num);
+    try std.testing.expectEqual(@as(u32, 2), result.dim_L_den);
+    try std.testing.expectEqual(@as(i32, 0), result.dim_M_num);
+    try std.testing.expectEqual(@as(u32, 1), result.dim_M_den);
+}
+
+test "dim_ctx_convert_expr exposes rational target dimensions" {
+    var ctx = dim.DimContext.init(std.testing.allocator);
+    defer ctx.deinit();
+
+    var result = std.mem.zeroes(DimQuantityResult);
+    const rc = dim_ctx_convert_expr(&ctx, "1 Pa^0.5".ptr, "1 Pa^0.5".len, "kg^(1/2)*m^(-1/2)*s^(-1)".ptr, "kg^(1/2)*m^(-1/2)*s^(-1)".len, &result);
+    defer freeQuantityResult(&result);
+
+    try std.testing.expectEqual(statusCode(.ok), rc);
+    try std.testing.expectEqual(@as(i32, 1), result.dim_M_num);
+    try std.testing.expectEqual(@as(u32, 2), result.dim_M_den);
+    try std.testing.expectEqual(@as(i32, -1), result.dim_L_num);
+    try std.testing.expectEqual(@as(u32, 2), result.dim_L_den);
+    try std.testing.expectEqual(@as(i32, -1), result.dim_T_num);
+    try std.testing.expectEqual(@as(u32, 1), result.dim_T_den);
 }
 
 test "dim_ctx_convert_value handles affine conversion" {

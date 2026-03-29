@@ -5,7 +5,7 @@ default:
 
 # Development
 build-wasm:
-  zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall
+  zig build wasm -Doptimize=ReleaseSmall
 
 build-native:
   zig build -Dtarget=native -Doptimize=ReleaseFast

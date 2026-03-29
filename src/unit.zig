@@ -1,5 +1,6 @@
 const std = @import("std");
 const Dimension = @import("dimension.zig").Dimension;
+const Rational = @import("rational.zig").Rational;
 const Quantity = @import("quantity.zig").Quantity;
 const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
 
@@ -47,18 +48,36 @@ pub const Unit = struct {
         return self.mul(other, symbol);
     }
 
-    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) Unit {
+    pub fn powInt(self: Unit, exponent: i32, symbol: []const u8) Unit {
         std.debug.assert(!self.isAffine());
         return .{
-            .dim = Dimension.pow(self.dim, exponent),
+            .dim = Dimension.mulByInt(self.dim, exponent),
             .scale = std.math.pow(f64, self.scale, @floatFromInt(exponent)),
             .symbol = symbol,
         };
     }
 
+    pub fn powRational(self: Unit, exponent: Rational, symbol: []const u8) Unit {
+        std.debug.assert(!self.isAffine());
+        return .{
+            .dim = Dimension.mulByRational(self.dim, exponent),
+            .scale = std.math.pow(f64, self.scale, exponent.toF64()),
+            .symbol = symbol,
+        };
+    }
+
+    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) Unit {
+        return self.powInt(exponent, symbol);
+    }
+
     pub fn powChecked(self: Unit, exponent: i32, symbol: []const u8) error{AffineUnitCombination}!Unit {
         if (self.isAffine()) return error.AffineUnitCombination;
-        return self.pow(exponent, symbol);
+        return self.powInt(exponent, symbol);
+    }
+
+    pub fn powRationalChecked(self: Unit, exponent: Rational, symbol: []const u8) error{AffineUnitCombination}!Unit {
+        if (self.isAffine()) return error.AffineUnitCombination;
+        return self.powRational(exponent, symbol);
     }
 
     pub fn div(self: Unit, other: Unit, symbol: []const u8) Unit {

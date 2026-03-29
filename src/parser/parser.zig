@@ -279,10 +279,14 @@ pub const Parser = struct {
         // }
 
         if (self.match(&.{TokenType.Number})) {
-            const lit = self.previous().literal.?;
+            const token = self.previous();
+            const lit = token.literal.?;
             const num_node = try self.allocator.create(ast_expr.Expr);
             num_node.* = ast_expr.Expr{
-                .literal = ast_expr.Literal{ .value = ast_expr.LiteralValue{ .number = lit.number } },
+                .literal = ast_expr.Literal{
+                    .value = ast_expr.LiteralValue{ .number = lit.number },
+                    .source_lexeme = token.lexeme,
+                },
             };
 
             // If a unit follows, parse a full unit expression
@@ -352,21 +356,18 @@ pub const Parser = struct {
 
     fn parseUnitTerm(self: *Parser) ParseError!*ast_expr.Expr {
         const id_tok = try self.consume(TokenType.Identifier, "Expected unit identifier");
-        var exponent: i32 = 1;
+        var exponent = dim.Rational.fromInt(1);
         var name = id_tok.lexeme;
 
         // Check if identifier ends with a superscript character
         if (extractSuperscriptFromIdentifier(id_tok.lexeme)) |result| {
             name = result.name;
-            exponent = result.exponent;
+            exponent = dim.Rational.fromInt(result.exponent);
         }
 
         // Also check for caret notation (takes precedence if both are present)
         if (self.match(&.{TokenType.Caret})) {
-            const exp_tok = try self.consume(TokenType.Number, "Expected exponent after '^'");
-            const lit = exp_tok.literal.?;
-            if (lit != .number) return error.ExpectedToken;
-            exponent = @intFromFloat(lit.number);
+            exponent = try self.parseUnitExponent();
         }
 
         const node_ptr = try self.allocator.create(ast_expr.Expr);
@@ -388,6 +389,42 @@ pub const Parser = struct {
             return inner;
         }
         return self.parseUnitTerm();
+    }
+
+    fn parseUnitExponent(self: *Parser) ParseError!dim.Rational {
+        if (self.match(&.{TokenType.Minus})) {
+            const exp_tok = try self.consume(TokenType.Number, "Expected exponent after '-'");
+            return (try parseLiteralRational(self, exp_tok)).negate();
+        }
+
+        if (self.match(&.{TokenType.Number})) {
+            return parseLiteralRational(self, self.previous());
+        }
+
+        if (!self.match(&.{TokenType.LParen})) {
+            return self.reportParseError(self.peek(), "Expected exact rational exponent after '^'");
+        }
+
+        var sign: i32 = 1;
+        if (self.match(&.{TokenType.Minus})) sign = -1;
+
+        const numerator_tok = try self.consume(TokenType.Number, "Expected exponent numerator");
+        var numerator = try parseLiteralRational(self, numerator_tok);
+        if (!numerator.isInteger()) return self.reportParseError(numerator_tok, "Expected integer numerator in rational exponent");
+        if (sign < 0) numerator = numerator.negate();
+
+        if (self.match(&.{TokenType.Slash})) {
+            const denominator_tok = try self.consume(TokenType.Number, "Expected exponent denominator");
+            const denominator = try parseLiteralRational(self, denominator_tok);
+            if (!denominator.isInteger() or denominator.num == 0) {
+                return self.reportParseError(denominator_tok, "Expected non-zero integer denominator in rational exponent");
+            }
+            _ = try self.consume(TokenType.RParen, "Expect ')' after rational exponent");
+            return dim.Rational.div(numerator, denominator);
+        }
+
+        _ = try self.consume(TokenType.RParen, "Expect ')' after exponent");
+        return numerator;
     }
 
     fn match(self: *Parser, types: []const TokenType) bool {
@@ -438,6 +475,10 @@ pub const Parser = struct {
         return ParseError.ExpectedToken;
     }
 };
+
+fn parseLiteralRational(self: *Parser, token: Token) ParseError!dim.Rational {
+    return dim.Rational.parseExactLiteral(token.lexeme) catch self.reportParseError(token, "Expected exact rational exponent");
+}
 
 pub fn reportTokenError(
     allocator: std.mem.Allocator,

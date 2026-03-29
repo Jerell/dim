@@ -6,6 +6,7 @@ const DisplayQuantity = dim.DisplayQuantity;
 const rt = dim;
 const findUnitAllDynamic = dim.findUnitAllDynamic;
 const Dimension = dim.Dimension;
+const Rational = dim.Rational;
 const SiRegistry = dim.Registries.si;
 const Format = dim.Format;
 
@@ -16,6 +17,8 @@ pub const RuntimeError = error{
     UnsupportedOperator,
     OutOfMemory,
     UndefinedVariable,
+    NonRationalDimensionalExponent,
+    AffineUnitExponentiation,
 };
 
 pub const LiteralValue = union(enum) {
@@ -28,6 +31,7 @@ pub const LiteralValue = union(enum) {
 
 pub const Literal = struct {
     value: LiteralValue,
+    source_lexeme: ?[]const u8 = null,
 
     pub fn print(self: Literal, writer: *std.Io.Writer) anyerror!void {
         switch (self.value) {
@@ -181,14 +185,12 @@ pub const Binary = struct {
                     return .{ .number = std.math.pow(f64, left.number, exp) };
                 }
                 if (left == .display_quantity) {
-                    // Try integer exponent fast-path
-                    const exp_int: i32 = @intFromFloat(exp);
-                    if (@as(f64, @floatFromInt(exp_int)) == exp) {
-                        const dq_int = try rt.powDisplay(allocator, left.display_quantity, exp_int);
+                    const rational_exp = extractExactRational(self.right) orelse return RuntimeError.NonRationalDimensionalExponent;
+                    if (rational_exp.isInteger()) {
+                        const dq_int = try rt.powDisplayInt(allocator, left.display_quantity, rational_exp.num);
                         return .{ .display_quantity = dq_int };
                     }
-                    // Fallback to fractional exponent; will error if dimensions don't reduce to integers
-                    const dq = try rt.powDisplayFloat(allocator, left.display_quantity, exp);
+                    const dq = try rt.powDisplayRational(allocator, left.display_quantity, rational_exp);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -259,7 +261,7 @@ pub const Unit = struct {
         var canonical_value: f64 = undefined;
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
-                if (ue.exponent == 1) {
+                if (ue.exponent.eqlInt(1)) {
                     const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
                     canonical_value = u.toCanonical(num);
                 } else {
@@ -330,7 +332,7 @@ pub const Display = struct {
         var converted_value: f64 = undefined;
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
-                if (ue.exponent == 1) {
+                if (ue.exponent.eqlInt(1)) {
                     const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
                     converted_value = u.fromCanonical(dq.value);
                 } else {
@@ -376,14 +378,11 @@ pub const Assignment = struct {
 
 pub const UnitExpr = struct {
     name: []const u8, // e.g. "m", "s"
-    exponent: i32 = 1,
+    exponent: Rational = Rational.fromInt(1),
 
     pub fn print(self: UnitExpr, writer: *std.Io.Writer) !void {
-        if (self.exponent == 1) {
-            try writer.print("{s}", .{self.name});
-        } else {
-            try writer.print("{s}^{d}", .{ self.name, self.exponent });
-        }
+        try writer.print("{s}", .{self.name});
+        try self.exponent.formatExponent(writer);
     }
 
     pub fn evaluate(
@@ -395,18 +394,20 @@ pub const UnitExpr = struct {
             return RuntimeError.UndefinedVariable;
         };
 
-        // Raise the unit’s dimension to the exponent
-        var dim_accum = u.dim;
-        if (self.exponent != 1) {
-            dim_accum = Dimension.pow(u.dim, self.exponent);
-        }
+        if (!self.exponent.eqlInt(1) and u.isAffine()) return RuntimeError.AffineUnitExponentiation;
+
+        // Raise the unit's dimension to the exponent
+        const dim_accum = if (self.exponent.eqlInt(1))
+            u.dim
+        else
+            Dimension.mulByRational(u.dim, self.exponent);
 
         // Compute conversion factor to canonical for this unit (raised to exponent)
         const base_factor = u.toCanonical(1.0);
-        const factor = if (self.exponent == 1)
+        const factor = if (self.exponent.eqlInt(1))
             base_factor
         else
-            std.math.pow(f64, base_factor, @as(f64, @floatFromInt(self.exponent)));
+            std.math.pow(f64, base_factor, self.exponent.toF64());
 
         return LiteralValue{
             .display_quantity = rt.DisplayQuantity{
@@ -421,11 +422,13 @@ pub const UnitExpr = struct {
     }
 
     pub fn toString(self: UnitExpr, allocator: std.mem.Allocator) ![]u8 {
-        if (self.exponent == 1) {
-            return try std.fmt.allocPrint(allocator, "{s}", .{self.name});
-        } else {
-            return try std.fmt.allocPrint(allocator, "{s}^{d}", .{ self.name, self.exponent });
+        if (self.exponent.eqlInt(1)) return try std.fmt.allocPrint(allocator, "{s}", .{self.name});
+
+        if (self.exponent.isInteger()) {
+            return try std.fmt.allocPrint(allocator, "{s}^{d}", .{ self.name, self.exponent.num });
         }
+
+        return try std.fmt.allocPrint(allocator, "{s}^({d}/{d})", .{ self.name, self.exponent.num, self.exponent.den });
     }
 };
 
@@ -562,6 +565,36 @@ fn isEqual(left: LiteralValue, right: LiteralValue) bool {
         .display_quantity => |lq| Dimension.eql(lq.dim, right.display_quantity.dim) and (lq.value == right.display_quantity.value),
         else => unreachable,
     };
+}
+
+fn extractExactRational(expr: *Expr) ?Rational {
+    return switch (expr.*) {
+        .literal => |literal| literalExactRational(literal),
+        .grouping => |grouping| extractExactRational(grouping.expression),
+        .unary => |unary| switch (unary.operator.type) {
+            .Minus => {
+                const inner = extractExactRational(unary.right) orelse return null;
+                return inner.negate();
+            },
+            else => null,
+        },
+        .binary => |binary| switch (binary.operator.type) {
+            .Slash => {
+                const numerator = extractExactRational(binary.left) orelse return null;
+                const denominator = extractExactRational(binary.right) orelse return null;
+                if (!numerator.isInteger() or !denominator.isInteger()) return null;
+                return Rational.div(numerator, denominator);
+            },
+            else => null,
+        },
+        else => null,
+    };
+}
+
+fn literalExactRational(literal: Literal) ?Rational {
+    if (literal.value != .number) return null;
+    const source = literal.source_lexeme orelse return null;
+    return Rational.parseExactLiteral(source) catch null;
 }
 
 test "AST Printer test" {

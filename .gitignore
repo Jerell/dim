@@ -1,5 +1,6 @@
 # Zig build cache
 .zig-cache/
+.zig-global-cache/
 zig-out/
 
 # IDE/editor files

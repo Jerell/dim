@@ -1,5 +1,6 @@
 const std = @import("std");
 const Dimension = @import("dimension.zig").Dimension;
+const Rational = @import("rational.zig").Rational;
 const Format = @import("format.zig");
 const SiRegistry = @import("registry/si.zig").Registry;
 
@@ -110,8 +111,8 @@ pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
     };
 }
 
-pub fn powDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32) !DisplayQuantity {
-    const new_dim = Dimension.pow(a.dim, exp_int);
+pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32) !DisplayQuantity {
+    const new_dim = Dimension.mulByInt(a.dim, exp_int);
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp_int });
     defer allocator.free(fallback);
@@ -132,28 +133,13 @@ pub fn powDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32
     };
 }
 
-pub fn powDisplayFloat(allocator: std.mem.Allocator, a: DisplayQuantity, exp: f64) error{ InvalidOperands, OutOfMemory }!DisplayQuantity {
-    // Multiply each base dimension exponent by exp and require an integer result.
-    const eps: f64 = 1e-9;
-    const roundToI32 = struct {
-        fn call(x: f64) error{InvalidOperands}!i32 {
-            const r = @round(x);
-            if (@abs(x - r) > eps) return error.InvalidOperands;
-            return @as(i32, @intFromFloat(r));
-        }
-    }.call;
+pub fn powDisplayRational(allocator: std.mem.Allocator, a: DisplayQuantity, exp: Rational) !DisplayQuantity {
+    const new_dim = Dimension.mulByRational(a.dim, exp);
 
-    const new_L = try roundToI32(@as(f64, @floatFromInt(a.dim.L)) * exp);
-    const new_M = try roundToI32(@as(f64, @floatFromInt(a.dim.M)) * exp);
-    const new_T = try roundToI32(@as(f64, @floatFromInt(a.dim.T)) * exp);
-    const new_I = try roundToI32(@as(f64, @floatFromInt(a.dim.I)) * exp);
-    const new_Th = try roundToI32(@as(f64, @floatFromInt(a.dim.Th)) * exp);
-    const new_N = try roundToI32(@as(f64, @floatFromInt(a.dim.N)) * exp);
-    const new_J = try roundToI32(@as(f64, @floatFromInt(a.dim.J)) * exp);
-
-    const new_dim = Dimension.init(new_L, new_M, new_T, new_I, new_Th, new_N, new_J);
-
-    const fallback = try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp });
+    const fallback = if (exp.isInteger())
+        try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp.num })
+    else
+        try std.fmt.allocPrint(allocator, "{s}^({d}/{d})", .{ a.unit, exp.num, exp.den });
     defer allocator.free(fallback);
     const normalized_unit = try Format.normalizeUnitString(
         allocator,
@@ -163,10 +149,14 @@ pub fn powDisplayFloat(allocator: std.mem.Allocator, a: DisplayQuantity, exp: f6
     );
 
     return DisplayQuantity{
-        .value = std.math.pow(f64, a.value, exp),
+        .value = std.math.pow(f64, a.value, exp.toF64()),
         .dim = new_dim,
         .unit = normalized_unit,
         .mode = .none,
         .is_delta = false,
     };
+}
+
+pub fn powDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32) !DisplayQuantity {
+    return powDisplayInt(allocator, a, exp_int);
 }

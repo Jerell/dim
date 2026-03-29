@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub const Dimension = @import("dimension.zig").Dimension;
+pub const Rational = @import("rational.zig").Rational;
 pub const Quantity = @import("quantity.zig").Quantity;
 pub const Dimensions = @import("dimension.zig").Dimensions;
 pub const Unit = @import("unit.zig").Unit;
@@ -15,7 +16,8 @@ pub const mulDisplay = @import("runtime.zig").mulDisplay;
 pub const divDisplay = @import("runtime.zig").divDisplay;
 pub const scaleDisplay = @import("runtime.zig").scaleDisplay;
 pub const powDisplay = @import("runtime.zig").powDisplay;
-pub const powDisplayFloat = @import("runtime.zig").powDisplayFloat;
+pub const powDisplayInt = @import("runtime.zig").powDisplayInt;
+pub const powDisplayRational = @import("runtime.zig").powDisplayRational;
 
 // Re-export formatting API
 pub const Format = @import("format.zig");
@@ -315,6 +317,33 @@ test "unit composition supports unchecked and checked affine handling" {
 
     try std.testing.expectError(error.AffineUnitCombination, _si.C.divChecked(_si.h, "C/h"));
     try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powChecked(2, "F^2"));
+}
+
+test "rational normalization and quantity power helpers" {
+    try std.testing.expect(Rational.eql(Rational.init(2, 4), Rational.init(1, 2)));
+    try std.testing.expect(Rational.eql(Rational.div(Rational.fromInt(-2), Rational.fromInt(-4)), Rational.init(1, 2)));
+    try std.testing.expect(Rational.eql(Rational.init(0, 5), Rational.fromInt(0)));
+
+    const sqrt_length_dim = Dimension.mulByRational(Dimensions.Length, Rational.init(1, 2));
+    try std.testing.expect(Rational.eql(sqrt_length_dim.L, Rational.init(1, 2)));
+
+    const area = Quantity(Dimensions.Area).init(16.0);
+    const sqrt_area = area.powRational(Rational.init(1, 2));
+    try std.testing.expectApproxEqAbs(4.0, sqrt_area.value, 1e-9);
+    try std.testing.expect(Dimension.eql(@TypeOf(sqrt_area).dim, Dimensions.Length));
+
+    const length = Quantity(Dimensions.Length).init(9.0);
+    const sqrt_length = length.powRational(Rational.init(1, 2));
+    try std.testing.expectApproxEqAbs(3.0, sqrt_length.value, 1e-9);
+    try std.testing.expect(Dimension.eql(@TypeOf(sqrt_length).dim, sqrt_length_dim));
+}
+
+test "unit powRational preserves exact dimensions and rejects affine units" {
+    const sqrt_meter = _si.m.powRational(Rational.init(1, 2), "m^(1/2)");
+    try std.testing.expect(Dimension.eql(sqrt_meter.dim, Dimension.mulByRational(Dimensions.Length, Rational.init(1, 2))));
+    try std.testing.expectApproxEqAbs(1.0, sqrt_meter.scale, 1e-12);
+
+    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powRationalChecked(Rational.init(1, 2), "F^(1/2)"));
 }
 
 test "temperature: abs + delta -> abs" {

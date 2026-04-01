@@ -90,6 +90,7 @@ pub fn build(b: *std.Build) void {
     });
     wasm_exe.entry = .disabled;
     wasm_exe.rdynamic = true;
+    wasm_exe.stack_size = 512 * 1024; // 512 KiB (default 16 MiB is excessive for this library)
 
     const install_wasm = b.addInstallArtifact(wasm_exe, .{});
     const wasm_step = b.step("wasm", "Build the WebAssembly wrapper");

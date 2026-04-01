@@ -117,7 +117,9 @@ jobs:
           PACKAGE_DIR="${PACKAGE_DIR//\\//}"
           RUNNER_TEMP="${RUNNER_TEMP//\\//}"
           ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
-          tar --force-local -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          TAR_FLAGS="-czf"
+          if [[ "$PLATFORM" == "windows" ]]; then TAR_FLAGS="--force-local $TAR_FLAGS"; fi
+          tar $TAR_FLAGS "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
           echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
           echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
 
@@ -160,7 +162,7 @@ jobs:
           PACKAGE_DIR="${PACKAGE_DIR//\\//}"
           RUNNER_TEMP="${RUNNER_TEMP//\\//}"
           ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
-          tar --force-local -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          tar -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
           echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
           echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
 

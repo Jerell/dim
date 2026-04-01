@@ -1,0 +1,207 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.version.outputs.should_release }}
+      reason: ${{ steps.version.outputs.reason }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Resolve release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="$(node scripts/release/read-version.mjs)"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$version" == "0.0.0" ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "reason=build.zig.zon is still set to 0.0.0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "reason=GitHub release ${tag} already exists" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "reason=Publishing ${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Report skipped release
+        if: steps.version.outputs.should_release != 'true'
+        run: |
+          echo "Skipping release: ${{ steps.version.outputs.reason }}"
+
+  build-native:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-15
+            platform: macos
+          - os: macos-15-intel
+            platform: macos
+          - os: windows-latest
+            platform: windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build native artifacts
+        shell: bash
+        run: zig build -Dtarget=native -Doptimize=ReleaseFast
+
+      - name: Package native bundle
+        id: package
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          RUNNER_ARCH: ${{ runner.arch }}
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) ARCH="x86_64" ;;
+            ARM64) ARCH="aarch64" ;;
+            *) ARCH="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')" ;;
+          esac
+
+          PACKAGE_DIR="$(node scripts/release/package-release.mjs native --version "$VERSION" --platform "$PLATFORM" --arch "$ARCH" --out-dir "$RUNNER_TEMP/release")"
+          ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
+          tar -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload native bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.asset_name }}
+          path: ${{ steps.package.outputs.asset_path }}
+          if-no-files-found: error
+
+  build-wasm:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build WebAssembly artifact
+        run: zig build wasm -Doptimize=ReleaseSmall
+
+      - name: Package WebAssembly bundle
+        id: package
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PACKAGE_DIR="$(node scripts/release/package-release.mjs wasm --version "$VERSION" --out-dir "$RUNNER_TEMP/release")"
+          ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
+          tar -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload WebAssembly bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.asset_name }}
+          path: ${{ steps.package.outputs.asset_path }}
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - prepare
+      - build-native
+      - build-wasm
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Flatten downloaded artifacts
+        shell: bash
+        run: |
+          find release-assets -type f -name '*.tar.gz' -exec mv {} . \;
+
+      - name: Generate checksums
+        shell: bash
+        run: sha256sum ./*.tar.gz > SHA256SUMS.txt
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ./*.tar.gz SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" ./*.tar.gz SHA256SUMS.txt \
+              --target "$TARGET_SHA" \
+              --title "$TAG" \
+              --generate-notes
+          fi

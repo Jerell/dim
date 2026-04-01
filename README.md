@@ -154,6 +154,8 @@ zig build wasm -Doptimize=ReleaseSmall
 # => zig-out/bin/dim_wasm.wasm
 ```
 
+The repo-owned TypeScript wrapper shipped with the WASM release bundle lives at `wasm/dim.ts`. By default it looks for a colocated `dim_wasm.wasm`, and you can also initialize it with explicit `{ wasmUrl }` or `{ wasmBytes }` options when another app wants to control loading.
+
 ### Exports
 
 - `dim_eval(input_ptr, input_len, out_ptr_ptr, out_len_ptr) -> i32` (0 = ok)
@@ -264,6 +266,20 @@ const { exports } = await WebAssembly.instantiate(mod, {});
 
 // exports contains: memory, dim_eval, dim_define, dim_clear, dim_clear_all, dim_alloc, dim_free
 ```
+
+---
+
+## 🚀 Releases
+
+GitHub Actions now handles both verification and packaging:
+
+- CI runs tests plus the WASM build on Ubuntu, and native release builds on Ubuntu, macOS, and Windows.
+- macOS native artifacts are built separately on Apple Silicon (`macos-15`) and Intel (`macos-15-intel`) runners, so releases include both `aarch64` and `x86_64` downloads.
+- A GitHub release is created automatically on pushes to `main` when `build.zig.zon` contains a new semantic version other than `0.0.0`.
+- Native release bundles include the CLI, static libraries, `dim.h`, the license, and the README.
+- The WASM release bundle includes `dim_wasm.wasm`, `dim.ts`, the license, and the README.
+
+To cut a release, bump `.version` in `build.zig.zon`, merge to `main`, and let the release workflow publish `v<version>`.
 
 ---
 

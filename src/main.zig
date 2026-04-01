@@ -19,7 +19,7 @@ pub fn main() !void {
 
     if (args.len == 1) {
         // No args: if stdin is a TTY, start REPL; otherwise, read from stdin once
-        if (std.posix.isatty(std.posix.STDIN_FILENO)) {
+        if (std.posix.isatty(std.fs.File.stdin().handle)) {
             try runPrompt(&io, allocator);
         } else {
             try runStdin(&io, allocator);

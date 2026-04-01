@@ -115,8 +115,9 @@ jobs:
 
           PACKAGE_DIR="$(node scripts/release/package-release.mjs native --version "$VERSION" --platform "$PLATFORM" --arch "$ARCH" --out-dir "$RUNNER_TEMP/release")"
           PACKAGE_DIR="${PACKAGE_DIR//\\//}"
+          RUNNER_TEMP="${RUNNER_TEMP//\\//}"
           ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
-          tar -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          tar --force-local -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
           echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
           echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
 
@@ -157,8 +158,9 @@ jobs:
         run: |
           PACKAGE_DIR="$(node scripts/release/package-release.mjs wasm --version "$VERSION" --out-dir "$RUNNER_TEMP/release")"
           PACKAGE_DIR="${PACKAGE_DIR//\\//}"
+          RUNNER_TEMP="${RUNNER_TEMP//\\//}"
           ASSET_NAME="$(basename "$PACKAGE_DIR").tar.gz"
-          tar -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
+          tar --force-local -czf "$RUNNER_TEMP/$ASSET_NAME" -C "$(dirname "$PACKAGE_DIR")" "$(basename "$PACKAGE_DIR")"
           echo "asset_path=$RUNNER_TEMP/$ASSET_NAME" >> "$GITHUB_OUTPUT"
           echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
 

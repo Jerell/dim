@@ -1,6 +1,26 @@
 const std = @import("std");
 const dim = @import("dim");
 
+// ---------------------------------------------------------------------------
+// FFI arena – single arena for all allocations that cross the JS ↔ WASM
+// boundary (input strings written by JS, output strings read by JS, and
+// temporary expression strings built inside exported functions).
+//
+// JS calls `dim_ffi_reset` once it has finished reading every pointer
+// returned by the preceding call(s).  This bulk-frees everything in O(1)
+// and keeps WASM linear-memory usage bounded regardless of how long the
+// process runs.
+// ---------------------------------------------------------------------------
+var ffi_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+
+fn ffiAllocator() std.mem.Allocator {
+    return ffi_arena.allocator();
+}
+
+pub export fn dim_ffi_reset() void {
+    _ = ffi_arena.reset(.retain_capacity);
+}
+
 pub const DimStatus = enum(i32) {
     ok = 0,
     eval_error = 1,
@@ -96,7 +116,7 @@ fn ensureContext(ctx: ?*dim.DimContext) ?*dim.DimContext {
 }
 
 fn evaluateOwned(ctx: *dim.DimContext, input: []const u8) !dim.LiteralValue {
-    return dim.evaluateWithContext(ctx, std.heap.page_allocator, input, null) orelse error.EvalError;
+    return dim.evaluateWithContext(ctx, ffiAllocator(), input, null) orelse error.EvalError;
 }
 
 fn literalDimension(value: dim.LiteralValue) ?dim.Dimension {
@@ -235,13 +255,12 @@ pub export fn dim_ctx_define(
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
     const name = name_ptr[0..name_len];
     const expr_src = expr_ptr[0..expr_len];
-    const assignment_src = std.fmt.allocPrint(std.heap.page_allocator, "{s}=( {s} )", .{ name, expr_src }) catch {
+    const ffi = ffiAllocator();
+    const assignment_src = std.fmt.allocPrint(ffi, "{s}=( {s} )", .{ name, expr_src }) catch {
         return statusCode(.out_of_memory);
     };
-    defer std.heap.page_allocator.free(assignment_src);
 
-    var result = evaluateOwned(actual, assignment_src) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &result);
+    _ = evaluateOwned(actual, assignment_src) catch return statusCode(.eval_error);
     return statusCode(.ok);
 }
 
@@ -282,13 +301,12 @@ pub export fn dim_ctx_convert_expr(
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
     const expr = expr_ptr[0..expr_len];
     const unit = unit_ptr[0..unit_len];
-    const source = std.fmt.allocPrint(std.heap.page_allocator, "{s} as {s}", .{ expr, unit }) catch {
+    const source = std.fmt.allocPrint(ffiAllocator(), "{s} as {s}", .{ expr, unit }) catch {
         out_result.* = std.mem.zeroes(DimQuantityResult);
         return statusCode(.out_of_memory);
     };
-    defer std.heap.page_allocator.free(source);
 
-    var value = evaluateOwned(actual, source) catch {
+    const value = evaluateOwned(actual, source) catch {
         out_result.* = std.mem.zeroes(DimQuantityResult);
         return statusCode(.eval_error);
     };
@@ -298,7 +316,6 @@ pub export fn dim_ctx_convert_expr(
             return statusCode(.ok);
         },
         else => {
-            dim.deinitLiteralValue(std.heap.page_allocator, &value);
             out_result.* = std.mem.zeroes(DimQuantityResult);
             return statusCode(.wrong_kind);
         },
@@ -316,15 +333,13 @@ pub export fn dim_ctx_convert_value(
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
     const source = buildConvertValueExpression(
-        std.heap.page_allocator,
+        ffiAllocator(),
         value,
         from_ptr[0..from_len],
         to_ptr[0..to_len],
     ) catch return statusCode(.out_of_memory);
-    defer std.heap.page_allocator.free(source);
 
-    var result = evaluateOwned(actual, source) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &result);
+    const result = evaluateOwned(actual, source) catch return statusCode(.eval_error);
 
     switch (result) {
         .display_quantity => |dq| {
@@ -344,14 +359,11 @@ pub export fn dim_ctx_is_compatible(
     out_bool: *u32,
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
-    var expr_value = evaluateOwned(actual, expr_ptr[0..expr_len]) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &expr_value);
+    const expr_value = evaluateOwned(actual, expr_ptr[0..expr_len]) catch return statusCode(.eval_error);
 
-    const unit_expr = buildUnitExpression(std.heap.page_allocator, unit_ptr[0..unit_len]) catch return statusCode(.out_of_memory);
-    defer std.heap.page_allocator.free(unit_expr);
+    const unit_expr = buildUnitExpression(ffiAllocator(), unit_ptr[0..unit_len]) catch return statusCode(.out_of_memory);
 
-    var unit_value = evaluateOwned(actual, unit_expr) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &unit_value);
+    const unit_value = evaluateOwned(actual, unit_expr) catch return statusCode(.eval_error);
 
     const expr_dim = literalDimension(expr_value) orelse return statusCode(.wrong_kind);
     const unit_dim = literalDimension(unit_value) orelse return statusCode(.wrong_kind);
@@ -368,10 +380,8 @@ pub export fn dim_ctx_same_dimension(
     out_bool: *u32,
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
-    var lhs_value = evaluateOwned(actual, lhs_ptr[0..lhs_len]) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &lhs_value);
-    var rhs_value = evaluateOwned(actual, rhs_ptr[0..rhs_len]) catch return statusCode(.eval_error);
-    defer dim.deinitLiteralValue(std.heap.page_allocator, &rhs_value);
+    const lhs_value = evaluateOwned(actual, lhs_ptr[0..lhs_len]) catch return statusCode(.eval_error);
+    const rhs_value = evaluateOwned(actual, rhs_ptr[0..rhs_len]) catch return statusCode(.eval_error);
 
     const lhs_dim = literalDimension(lhs_value) orelse return statusCode(.wrong_kind);
     const rhs_dim = literalDimension(rhs_value) orelse return statusCode(.wrong_kind);
@@ -442,12 +452,13 @@ pub export fn dim_ctx_batch_convert_values(
     return statusCode(.ok);
 }
 
-pub export fn dim_free(ptr: [*]u8, len: usize) void {
-    std.heap.page_allocator.free(ptr[0..len]);
+pub export fn dim_free(_: [*]u8, _: usize) void {
+    // No-op: all FFI allocations live in the ffi_arena and are bulk-freed
+    // by dim_ffi_reset.
 }
 
 pub export fn dim_alloc(n: usize) ?[*]u8 {
-    const buf = std.heap.page_allocator.alloc(u8, n) catch return null;
+    const buf = ffiAllocator().alloc(u8, n) catch return null;
     return buf.ptr;
 }
 

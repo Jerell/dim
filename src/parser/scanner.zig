@@ -16,7 +16,7 @@ pub const Scanner = struct {
     pub fn init(allocator: std.mem.Allocator, err_writer: ?*std.Io.Writer, source: []const u8) !Scanner {
         return .{
             .source = source,
-            .tokens = .{},
+            .tokens = .empty,
             .allocator = allocator,
             .err_writer = err_writer,
             .start = 0,

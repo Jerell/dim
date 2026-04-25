@@ -649,25 +649,13 @@ test "AST Printer test" {
     // defer binary_ptr.deinit(allocator);
     defer allocator.destroy(binary_ptr);
 
-    // Use fixedBufferStream but adapt its GenericWriter to *std.Io.Writer
     var out_buf: [256]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&out_buf);
-    var gw = fbs.writer();
-    var bridge_buf: [32]u8 = undefined;
-    var adapter = gw.adaptToNewApi(&bridge_buf);
-    const w: *std.Io.Writer = &adapter.new_interface;
+    var fixed_writer: std.Io.Writer = .fixed(&out_buf);
+    const w: *std.Io.Writer = &fixed_writer;
 
     try binary_ptr.print(w);
 
-    // Manually flush the adapted writer's buffered data into the fixed buffer stream
-    while (true) {
-        const pending = w.buffered();
-        if (pending.len == 0) break;
-        try gw.writeAll(pending);
-        _ = w.consume(pending.len);
-    }
-
-    const result = fbs.getWritten();
+    const result = w.buffered();
 
     const expected = "(* (- 123) (group 45.67))";
     try std.testing.expectEqualStrings(expected, result);

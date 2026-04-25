@@ -245,28 +245,28 @@ fn formatIntegerPart(
         }
     }
 
-    var buf = std.ArrayListUnmanaged(u8){};
-    defer buf.deinit(allocator);
-    var w = buf.writer(allocator);
+    var aw: std.Io.Writer.Allocating = .init(allocator);
+    defer aw.deinit();
+    const w = &aw.writer;
     var wrote_any = false;
 
-    try appendIntegerComponent(&w, &wrote_any, base.M, dim.M.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.L, dim.L.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.T, dim.T.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.I, dim.I.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.Th, dim.Th.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.N, dim.N.toInt().?);
-    try appendIntegerComponent(&w, &wrote_any, base.J, dim.J.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.M, dim.M.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.L, dim.L.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.T, dim.T.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.I, dim.I.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.Th, dim.Th.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.N, dim.N.toInt().?);
+    try appendIntegerComponent(w, &wrote_any, base.J, dim.J.toInt().?);
 
     if (!wrote_any) return null;
-    return try buf.toOwnedSlice(allocator);
+    return try aw.toOwnedSlice();
 }
 
 fn appendIntegerComponent(writer: anytype, wrote_any: *bool, symbol: []const u8, exponent: i32) !void {
     if (exponent == 0) return;
-    if (wrote_any.*) try writer.writeAll("*");
-    try writer.writeAll(symbol);
-    if (exponent != 1) try writer.print("^{d}", .{exponent});
+    if (wrote_any.*) writer.writeAll("*") catch return error.OutOfMemory;
+    writer.writeAll(symbol) catch return error.OutOfMemory;
+    if (exponent != 1) writer.print("^{d}", .{exponent}) catch return error.OutOfMemory;
     wrote_any.* = true;
 }
 
@@ -275,27 +275,27 @@ fn formatSignedProduct(
     dim: Dimension,
     base: BaseSymbols,
 ) ![]u8 {
-    var buf = std.ArrayListUnmanaged(u8){};
-    defer buf.deinit(allocator);
-    var w = buf.writer(allocator);
+    var aw: std.Io.Writer.Allocating = .init(allocator);
+    defer aw.deinit();
+    const w = &aw.writer;
     var wrote_any = false;
 
-    try appendSignedComponent(&w, &wrote_any, base.M, dim.M);
-    try appendSignedComponent(&w, &wrote_any, base.L, dim.L);
-    try appendSignedComponent(&w, &wrote_any, base.T, dim.T);
-    try appendSignedComponent(&w, &wrote_any, base.I, dim.I);
-    try appendSignedComponent(&w, &wrote_any, base.Th, dim.Th);
-    try appendSignedComponent(&w, &wrote_any, base.N, dim.N);
-    try appendSignedComponent(&w, &wrote_any, base.J, dim.J);
+    try appendSignedComponent(w, &wrote_any, base.M, dim.M);
+    try appendSignedComponent(w, &wrote_any, base.L, dim.L);
+    try appendSignedComponent(w, &wrote_any, base.T, dim.T);
+    try appendSignedComponent(w, &wrote_any, base.I, dim.I);
+    try appendSignedComponent(w, &wrote_any, base.Th, dim.Th);
+    try appendSignedComponent(w, &wrote_any, base.N, dim.N);
+    try appendSignedComponent(w, &wrote_any, base.J, dim.J);
 
-    if (!wrote_any) try w.writeAll("1");
-    return buf.toOwnedSlice(allocator);
+    if (!wrote_any) w.writeAll("1") catch return error.OutOfMemory;
+    return aw.toOwnedSlice();
 }
 
 fn appendSignedComponent(writer: anytype, wrote_any: *bool, symbol: []const u8, exponent: Rational) !void {
     if (exponent.isZero()) return;
-    if (wrote_any.*) try writer.writeAll("*");
-    try writer.writeAll(symbol);
-    try exponent.formatExponent(writer);
+    if (wrote_any.*) writer.writeAll("*") catch return error.OutOfMemory;
+    writer.writeAll(symbol) catch return error.OutOfMemory;
+    exponent.formatExponent(writer) catch return error.OutOfMemory;
     wrote_any.* = true;
 }

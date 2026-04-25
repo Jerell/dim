@@ -42,14 +42,14 @@ pub const kgps = dim.Unit{ .dim = dim.Dimensions.MassFlowRate, .scale = 1.0, .sy
 pub const Cp = dim.Unit{ .dim = dim.Dimensions.SpecificHeatCapacity, .scale = 1.0, .symbol = "J/(kg·K)" };
 
 pub const Units = [_]dim.Unit{
-    m,    km,   cm, mm,
-    g,    kg,   t,  s,
-    min,  h,    A,  K,
-    C,    mol,  cd, Pa,
-    atm,  bar,  bara, barg,
-    J,    W,    N,
-    mps,  mps2, m2, m3,
-    kgps, Cp,
+    m,    km,  cm,   mm,
+    g,    kg,  t,    s,
+    min,  h,   A,    K,
+    C,    mol, cd,   Pa,
+    atm,  bar, bara, barg,
+    J,    W,   N,    mps,
+    mps2, m2,  m3,   kgps,
+    Cp,
 };
 
 const aliases = [_]dim.Alias{

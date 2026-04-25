@@ -42,8 +42,8 @@ pub const ConstantEntry = struct {
 pub const DimContext = struct {
     constants_arena: std.heap.ArenaAllocator,
     scratch_arena: std.heap.ArenaAllocator,
-    consts: std.StringHashMapUnmanaged(Unit) = .{},
-    const_names: std.ArrayListUnmanaged([]const u8) = .{},
+    consts: std.StringHashMapUnmanaged(Unit) = .empty,
+    const_names: std.ArrayListUnmanaged([]const u8) = .empty,
 
     pub fn init(backing_allocator: std.mem.Allocator) DimContext {
         return .{
@@ -55,8 +55,8 @@ pub const DimContext = struct {
     pub fn deinit(self: *DimContext) void {
         self.constants_arena.deinit();
         self.scratch_arena.deinit();
-        self.consts = .{};
-        self.const_names = .{};
+        self.consts = .empty;
+        self.const_names = .empty;
     }
 
     fn constAllocator(self: *DimContext) std.mem.Allocator {

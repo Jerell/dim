@@ -61,12 +61,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/wasm.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "dim", .module = mod },
             },
         }),
     });
-    c_lib.linkLibC();
     b.installArtifact(c_lib);
 
     // WebAssembly wrapper (exports JS-callable API).

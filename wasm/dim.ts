@@ -184,12 +184,25 @@ function createWasiImports(
       fd_read: () => 0,
       fd_pread: () => 0,
       fd_pwrite: () => 0,
+      fd_sync: () => 0,
       fd_fdstat_get: () => 0,
+      fd_fdstat_set_flags: () => 0,
+      fd_filestat_set_size: () => 0,
+      fd_filestat_set_times: () => 0,
       fd_filestat_get: () => 0,
       path_filestat_get: () => 0,
+      path_filestat_set_times: () => 0,
       fd_prestat_get: () => 0,
       fd_prestat_dir_name: () => 0,
       path_open: () => 0,
+      path_link: () => 0,
+      path_create_directory: () => 0,
+      path_readlink: () => 0,
+      path_symlink: () => 0,
+      path_rename: () => 0,
+      path_remove_directory: () => 0,
+      path_unlink_file: () => 0,
+      fd_readdir: () => 0,
       environ_sizes_get: (countPtr: number, bufSizePtr: number) => {
         const memory = getMemory();
         if (!memory) return 0;
@@ -208,7 +221,19 @@ function createWasiImports(
         return 0;
       },
       args_get: () => 0,
+      clock_res_get: () => 0,
       clock_time_get: () => 0,
+      poll_oneoff: (
+        _inPtr: number,
+        _outPtr: number,
+        _subscriptionCount: number,
+        eventCountPtr: number,
+      ) => {
+        const memory = getMemory();
+        if (!memory) return 0;
+        new DataView(memory.buffer).setUint32(eventCountPtr, 0, true);
+        return 0;
+      },
       proc_exit: () => 0,
     },
   };
@@ -437,6 +462,10 @@ function expandScientificNotation(value: string): string {
   const [integerPart, fractionPart = ""] = coefficient.split(".");
   const digits = `${integerPart}${fractionPart}`.replace(/^0+/, "") || "0";
   const decimalIndex = integerPart.length + exponent;
+
+  if (Math.abs(decimalIndex) > 4096) {
+    return value;
+  }
 
   if (digits === "0") {
     return "0";

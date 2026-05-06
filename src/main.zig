@@ -199,6 +199,24 @@ test "unicode dot operator as multiplication for numbers" {
     }
 }
 
+test "dimensionless quotient does not print pseudo-unit" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const result = try evalTestExpr(allocator, "5 m / 2 m");
+    switch (result) {
+        .display_quantity => |dq| {
+            var aw: std.Io.Writer.Allocating = .init(allocator);
+            defer aw.deinit();
+
+            try dq.format(&aw.writer);
+            try std.testing.expectEqualStrings("2.5", aw.written());
+        },
+        else => std.debug.panic("expected display_quantity result", .{}),
+    }
+}
+
 test "middle dot works inside unit expressions after 'as' (J/kg·K)" {
     const err_writer: ?*std.Io.Writer = null;
 

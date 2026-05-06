@@ -589,25 +589,31 @@ function mod(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
 }
 
+function isDimensionless(dim: DimDimension): boolean {
+  return BASE_UNIT_COMPONENTS.every(({ key }) => dim[key].num === 0);
+}
+
 export function formatQuantity(result: DimQuantityResult): string {
   const prefix = result.isDelta ? "\u0394" : "";
+  const showUnit = !isDimensionless(result.dim) || result.unit !== "1";
+  const suffix = showUnit ? ` ${result.unit}` : "";
   switch (result.mode) {
     case "auto":
-      return `${prefix}${result.value.toFixed(3)} ${result.unit}`;
+      return `${prefix}${result.value.toFixed(3)}${suffix}`;
     case "scientific":
-      return `${prefix}${formatScientific(result.value)} ${result.unit}`;
+      return `${prefix}${formatScientific(result.value)}${suffix}`;
     case "engineering": {
       if (result.value === 0) {
-        return `${prefix}0.000 ${result.unit}`;
+        return `${prefix}0.000${suffix}`;
       }
       const exponent = Math.floor(Math.log10(Math.abs(result.value)));
       const engineeringExponent = exponent - mod(exponent, 3);
       const scaled = result.value / 10 ** engineeringExponent;
-      return `${prefix}${scaled.toFixed(3)}e${engineeringExponent} ${result.unit}`;
+      return `${prefix}${scaled.toFixed(3)}e${engineeringExponent}${suffix}`;
     }
     case "none":
     default:
-      return `${prefix}${result.value} ${result.unit}`;
+      return `${prefix}${result.value}${suffix}`;
   }
 }
 

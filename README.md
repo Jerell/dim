@@ -38,6 +38,7 @@ $ dim "1 bar as kPa"
 
 - **CLI (`dim` tool)**
   - Parse expressions like `10 C + 20 F as K`.
+  - Parse scientific notation such as `1.5e3 m` and `2E-3 km`.
   - Support arithmetic (`+`, `-`, `*`, `/`).
   - Support derived units (`m/s`, `N`, `J`).
   - `as <unit-or-constant>` to force output in a specific unit or user-defined constant; supports compound expressions after `as` (e.g., `kg/d`).
@@ -246,6 +247,25 @@ Notes:
 - Returned strings are module-owned; always free them with `dim_free(ptr, len)`.
 - `dim_define(name, value_expr)` lets you create constants usable in expressions (e.g. `d = (24 h)` is equivalent to calling `dim_define("d", "24 h")`).
 - The expression grammar is the same as the CLI (supports `as`, compound units, arithmetic, and formatting modes like `:engineering`).
+
+### Testing and Fuzzing
+
+Run the complete test suite with:
+
+```bash
+zig build test
+```
+
+The test suite also includes a built-in Zig fuzz target for arbitrary
+expressions, REPL sessions, and unit expressions. Run a bounded fuzz pass with:
+
+```bash
+just fuzz 10000
+# or: zig build test --fuzz=10000
+```
+
+Fuzzing uses Zig 0.16's `std.testing.fuzz`; malformed input is expected to
+return an error, not crash the parser or evaluator.
 
 ### Minimal loader (no WASI required)
 

@@ -1,5 +1,6 @@
 pub const TokenType = enum {
     Number,
+    Superscript,
     Dot,
     Comma,
     // units

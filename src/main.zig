@@ -116,6 +116,7 @@ fn runStdin(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Write
 fn evalTestExpr(allocator: std.mem.Allocator, line: []const u8) (TestError || dim.RuntimeError || error{OutOfMemory})!dim.LiteralValue {
     var scanner = try Scanner.init(allocator, null, line);
     const tokens = try scanner.scanTokens();
+    if (scanner.hadError) return error.ParseFailed;
 
     var parser = Parser.init(allocator, tokens, null);
     const maybe_expr = parser.parse();
@@ -127,6 +128,7 @@ fn evalTestExpr(allocator: std.mem.Allocator, line: []const u8) (TestError || di
 fn parseFails(allocator: std.mem.Allocator, line: []const u8) !bool {
     var scanner = try Scanner.init(allocator, null, line);
     const tokens = try scanner.scanTokens();
+    if (scanner.hadError) return true;
 
     var parser = Parser.init(allocator, tokens, null);
     const maybe_expr = parser.parse();
@@ -172,6 +174,67 @@ test "unicode middle dot as multiplication for numbers" {
     switch (eval_result) {
         .number => |n| try std.testing.expectApproxEqAbs(6.0, n, 1e-9),
         else => std.debug.panic("expected numeric result", .{}),
+    }
+}
+
+test "scientific notation parses in numeric and quantity expressions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try expectDisplayQuantity(allocator, "1.5e3 m", 1500.0, "m", false);
+    try expectDisplayQuantity(allocator, "2E-3 km", 2.0, "km", false);
+
+    const scalar = try evalTestExpr(allocator, "2e6 / 3");
+    switch (scalar) {
+        .number => |value| try std.testing.expectApproxEqAbs(2e6 / 3.0, value, 1e-9),
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+test "scientific notation requires exponent digits" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try std.testing.expect(try parseFails(allocator, "1e"));
+    try std.testing.expect(try parseFails(allocator, "1e+ m"));
+    try std.testing.expect(try parseFails(allocator, "1e 2 m"));
+}
+
+test "hostile exponents return errors instead of trapping" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try std.testing.expectError(
+        dim.RuntimeError.DimensionOverflow,
+        evalTestExpr(allocator, "1 m^2147483647*m^2147483647"),
+    );
+    try std.testing.expect(try parseFails(allocator, "1 m^0.000000000000000000000000"));
+}
+
+test "unicode superscripts work on quantities and inverse units" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const cube = try evalTestExpr(allocator, "(2 m)³");
+    switch (cube) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(8.0, dq.value, 1e-9);
+            try std.testing.expect(dim.Dimension.eql(dq.dim, dim.Dimensions.Volume));
+        },
+        else => return error.TestUnexpectedResult,
+    }
+
+    const inverse = try evalTestExpr(allocator, "10 s⁻¹");
+    switch (inverse) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(10.0, dq.value, 1e-9);
+            try std.testing.expect(dq.dim.T.eqlInt(-1));
+        },
+        else => return error.TestUnexpectedResult,
     }
 }
 
@@ -339,6 +402,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     // 1. Scan
     var scanner = try Scanner.init(allocator, err_writer, trimmed);
     const tokens = try scanner.scanTokens();
+    if (scanner.hadError) return;
 
     // Handle commands using tokens (post-tokenization)
     if (tokens.len >= 1 and tokens[0].type == .List) {

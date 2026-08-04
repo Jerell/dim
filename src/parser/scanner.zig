@@ -12,6 +12,7 @@ pub const Scanner = struct {
     start: usize,
     current: usize,
     line: usize,
+    hadError: bool,
 
     pub fn init(allocator: std.mem.Allocator, err_writer: ?*std.Io.Writer, source: []const u8) !Scanner {
         return .{
@@ -22,6 +23,7 @@ pub const Scanner = struct {
             .start = 0,
             .current = 0,
             .line = 1,
+            .hadError = false,
         };
     }
 
@@ -60,6 +62,7 @@ pub const Scanner = struct {
             try self.addToken(TokenType.Star, null);
             return;
         }
+        if (try self.superscript(c)) return;
         switch (c) {
             '(' => try self.addToken(TokenType.LParen, null),
             ')' => try self.addToken(TokenType.RParen, null),
@@ -95,6 +98,7 @@ pub const Scanner = struct {
                 } else if (isAlpha(c)) {
                     try self.identifier();
                 } else {
+                    self.hadError = true;
                     errors.reportError(self.err_writer, self.line, "unexpected character");
                 }
             },
@@ -134,6 +138,11 @@ pub const Scanner = struct {
         return self.source[self.current + 1];
     }
 
+    fn peekNextNext(self: *const Scanner) u8 {
+        if (self.current + 2 >= self.source.len) return 0;
+        return self.source[self.current + 2];
+    }
+
     // fn string(self: *Scanner) !void {
     //     while (self.peek() != '"' and !self.isAtEnd()) {
     //         if (self.peek() == '\n') self.line += 1;
@@ -168,8 +177,26 @@ pub const Scanner = struct {
             }
         }
 
+        // Look for an optional scientific exponent. Keep the exponent marker
+        // attached to the number so inputs such as `1.5e3 m` remain one token.
+        if (self.peek() == 'e' or self.peek() == 'E') {
+            _ = self.advance();
+            if (self.peek() == '+' or self.peek() == '-') {
+                _ = self.advance();
+            }
+            if (!isDigit(self.peek())) {
+                self.hadError = true;
+                errors.reportError(self.err_writer, self.line, "Invalid number format");
+                return;
+            }
+            while (isDigit(self.peek())) {
+                _ = self.advance();
+            }
+        }
+
         const num_str = self.source[self.start..self.current];
         const value = std.fmt.parseFloat(f64, num_str) catch {
+            self.hadError = true;
             errors.reportError(self.err_writer, self.line, "Invalid number format");
             return;
         };
@@ -205,8 +232,8 @@ pub const Scanner = struct {
                 if (self.current + 2 < self.source.len) {
                     const second = self.source[self.current + 1];
                     const third = self.source[self.current + 2];
-                    if (second == 0x81 and (third == 0xB0 or (third >= 0xB4 and third <= 0xB9))) {
-                        // It's a superscript: ⁰ or ⁴-⁹
+                    if (second == 0x81 and (third == 0xB0 or third == 0xBB or (third >= 0xB4 and third <= 0xB9))) {
+                        // It's a superscript: ⁰, ⁻, or ⁴-⁹
                         _ = self.advance(); // consume 0xE2
                         _ = self.advance(); // consume 0x81
                         _ = self.advance(); // consume third byte
@@ -228,6 +255,34 @@ pub const Scanner = struct {
 
         try self.addToken(tokentype, null);
     }
+
+    fn superscript(self: *Scanner, first: u8) !bool {
+        var consumed = false;
+        if (first == 0xC2 and isTwoByteSuperscript(self.peek())) {
+            _ = self.advance();
+            consumed = true;
+        } else if (first == 0xE2 and self.peek() == 0x81 and isThreeByteSuperscript(self.peekNext())) {
+            self.current += 2;
+            consumed = true;
+        }
+
+        if (!consumed) return false;
+
+        while (!self.isAtEnd()) {
+            if (self.peek() == 0xC2 and isTwoByteSuperscript(self.peekNext())) {
+                self.current += 2;
+            } else if (self.peek() == 0xE2 and self.peekNext() == 0x81 and
+                isThreeByteSuperscript(self.peekNextNext()))
+            {
+                self.current += 3;
+            } else {
+                break;
+            }
+        }
+
+        try self.addToken(TokenType.Superscript, null);
+        return true;
+    }
 };
 
 fn isDigit(char: u8) bool {
@@ -240,6 +295,14 @@ fn isAlpha(char: u8) bool {
 
 fn isAlphaNumeric(char: u8) bool {
     return isAlpha(char) or isDigit(char);
+}
+
+fn isTwoByteSuperscript(char: u8) bool {
+    return char == 0xB2 or char == 0xB3 or char == 0xB9;
+}
+
+fn isThreeByteSuperscript(char: u8) bool {
+    return char == 0xB0 or char == 0xBB or (char >= 0xB4 and char <= 0xB9);
 }
 
 // Check if a byte is the start of a superscript character

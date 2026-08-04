@@ -118,7 +118,7 @@ pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}
 }
 
 pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    const new_dim = Dimension.add(a.dim, b.dim);
+    const new_dim = Dimension.checkedAdd(a.dim, b.dim) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}*{s}", .{ a.unit, b.unit });
     defer allocator.free(fallback);
@@ -140,7 +140,7 @@ pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    const new_dim = Dimension.sub(a.dim, b.dim);
+    const new_dim = Dimension.checkedSub(a.dim, b.dim) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ a.unit, b.unit });
     defer allocator.free(fallback);
@@ -162,7 +162,7 @@ pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32) !DisplayQuantity {
-    const new_dim = Dimension.mulByInt(a.dim, exp_int);
+    const new_dim = Dimension.checkedMulByRational(a.dim, Rational.fromInt(exp_int)) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp_int });
     defer allocator.free(fallback);
@@ -185,7 +185,7 @@ pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: 
 }
 
 pub fn powDisplayRational(allocator: std.mem.Allocator, a: DisplayQuantity, exp: Rational) !DisplayQuantity {
-    const new_dim = Dimension.mulByRational(a.dim, exp);
+    const new_dim = Dimension.checkedMulByRational(a.dim, exp) orelse return error.DimensionOverflow;
 
     const fallback = if (exp.isInteger())
         try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp.num })

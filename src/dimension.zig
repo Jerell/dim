@@ -53,6 +53,42 @@ pub const Dimension = struct {
         };
     }
 
+    pub fn checkedAdd(a: Dimension, b: Dimension) ?Dimension {
+        return .{
+            .L = Rational.checkedAdd(a.L, b.L) orelse return null,
+            .M = Rational.checkedAdd(a.M, b.M) orelse return null,
+            .T = Rational.checkedAdd(a.T, b.T) orelse return null,
+            .I = Rational.checkedAdd(a.I, b.I) orelse return null,
+            .Th = Rational.checkedAdd(a.Th, b.Th) orelse return null,
+            .N = Rational.checkedAdd(a.N, b.N) orelse return null,
+            .J = Rational.checkedAdd(a.J, b.J) orelse return null,
+        };
+    }
+
+    pub fn checkedSub(a: Dimension, b: Dimension) ?Dimension {
+        return .{
+            .L = Rational.checkedSub(a.L, b.L) orelse return null,
+            .M = Rational.checkedSub(a.M, b.M) orelse return null,
+            .T = Rational.checkedSub(a.T, b.T) orelse return null,
+            .I = Rational.checkedSub(a.I, b.I) orelse return null,
+            .Th = Rational.checkedSub(a.Th, b.Th) orelse return null,
+            .N = Rational.checkedSub(a.N, b.N) orelse return null,
+            .J = Rational.checkedSub(a.J, b.J) orelse return null,
+        };
+    }
+
+    pub fn checkedMulByRational(self: Dimension, exponent: Rational) ?Dimension {
+        return .{
+            .L = Rational.checkedMul(self.L, exponent) orelse return null,
+            .M = Rational.checkedMul(self.M, exponent) orelse return null,
+            .T = Rational.checkedMul(self.T, exponent) orelse return null,
+            .I = Rational.checkedMul(self.I, exponent) orelse return null,
+            .Th = Rational.checkedMul(self.Th, exponent) orelse return null,
+            .N = Rational.checkedMul(self.N, exponent) orelse return null,
+            .J = Rational.checkedMul(self.J, exponent) orelse return null,
+        };
+    }
+
     pub fn eql(a: Dimension, b: Dimension) bool {
         return Rational.eql(a.L, b.L) and Rational.eql(a.M, b.M) and Rational.eql(a.T, b.T) and
             Rational.eql(a.I, b.I) and Rational.eql(a.Th, b.Th) and Rational.eql(a.N, b.N) and Rational.eql(a.J, b.J);

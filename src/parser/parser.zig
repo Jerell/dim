@@ -211,6 +211,29 @@ pub const Parser = struct {
                 },
             };
             expr_ptr = node_ptr;
+        } else if (self.match(&.{TokenType.Superscript})) {
+            const superscript = self.previous();
+            const exponent = parseSuperscriptExponent(superscript.lexeme) orelse
+                return self.reportParseError(superscript, "Expected valid superscript exponent");
+            const source_lexeme = try std.fmt.allocPrint(self.allocator, "{d}", .{exponent});
+
+            const right = try self.allocator.create(ast_expr.Expr);
+            right.* = ast_expr.Expr{
+                .literal = ast_expr.Literal{
+                    .value = .{ .number = @floatFromInt(exponent) },
+                    .source_lexeme = source_lexeme,
+                },
+            };
+
+            const node_ptr = try self.allocator.create(ast_expr.Expr);
+            node_ptr.* = ast_expr.Expr{
+                .binary = ast_expr.Binary{
+                    .left = expr_ptr,
+                    .operator = Token.init(TokenType.Caret, "^", null, superscript.line),
+                    .right = right,
+                },
+            };
+            expr_ptr = node_ptr;
         }
         return expr_ptr;
     }
@@ -394,7 +417,9 @@ pub const Parser = struct {
     fn parseUnitExponent(self: *Parser) ParseError!dim.Rational {
         if (self.match(&.{TokenType.Minus})) {
             const exp_tok = try self.consume(TokenType.Number, "Expected exponent after '-'");
-            return (try parseLiteralRational(self, exp_tok)).negate();
+            const exponent = try parseLiteralRational(self, exp_tok);
+            return exponent.checkedNegate() orelse
+                self.reportParseError(exp_tok, "Rational exponent overflow");
         }
 
         if (self.match(&.{TokenType.Number})) {
@@ -420,7 +445,8 @@ pub const Parser = struct {
                 return self.reportParseError(denominator_tok, "Expected non-zero integer denominator in rational exponent");
             }
             _ = try self.consume(TokenType.RParen, "Expect ')' after rational exponent");
-            return dim.Rational.div(numerator, denominator);
+            return dim.Rational.checkedDiv(numerator, denominator) orelse
+                self.reportParseError(denominator_tok, "Rational exponent overflow");
         }
 
         _ = try self.consume(TokenType.RParen, "Expect ')' after exponent");
@@ -496,46 +522,90 @@ pub fn reportTokenError(
     }
 }
 
-// Extract superscript exponent from identifier if present
-// Returns the base name and exponent, or null if no superscript found
+const SuperscriptSuffix = struct {
+    end: usize,
+    exponent: i32,
+};
+
+const TrailingSuperscript = struct {
+    digit: i32,
+    width: usize,
+    is_minus: bool = false,
+};
+
 fn extractSuperscriptFromIdentifier(identifier: []const u8) ?struct { name: []const u8, exponent: i32 } {
-    if (identifier.len < 2) return null;
+    const suffix = parseSuperscriptSuffix(identifier) orelse return null;
+    if (suffix.end == 0) return null;
+    return .{ .name = identifier[0..suffix.end], .exponent = suffix.exponent };
+}
 
-    // Check for 2-byte superscripts: ¹ (0xC2 0xB9), ² (0xC2 0xB2), ³ (0xC2 0xB3)
-    if (identifier.len >= 2) {
-        const last_two = identifier[identifier.len - 2 ..];
+fn parseSuperscriptExponent(text: []const u8) ?i32 {
+    const suffix = parseSuperscriptSuffix(text) orelse return null;
+    if (suffix.end != 0) return null;
+    return suffix.exponent;
+}
+
+fn parseSuperscriptSuffix(text: []const u8) ?SuperscriptSuffix {
+    var end = text.len;
+    var digits: [10]i32 = undefined;
+    var digit_count: usize = 0;
+    var negative = false;
+
+    while (end > 0) {
+        const trailing = readTrailingSuperscript(text[0..end]) orelse break;
+        if (trailing.is_minus) {
+            if (negative or digit_count == 0) return null;
+            negative = true;
+            end -= trailing.width;
+            break;
+        }
+        if (digit_count == digits.len) return null;
+        digits[digit_count] = trailing.digit;
+        digit_count += 1;
+        end -= trailing.width;
+    }
+
+    if (digit_count == 0) return null;
+
+    var exponent: i32 = 0;
+    var index = digit_count;
+    while (index > 0) {
+        index -= 1;
+        const digit = digits[index];
+        if (exponent > @divTrunc(std.math.maxInt(i32) - digit, 10)) return null;
+        exponent = exponent * 10 + digit;
+    }
+    if (negative) exponent = -exponent;
+    return .{ .end = end, .exponent = exponent };
+}
+
+fn readTrailingSuperscript(text: []const u8) ?TrailingSuperscript {
+    if (text.len >= 2) {
+        const last_two = text[text.len - 2 ..];
         if (last_two[0] == 0xC2) {
-            const exp: ?i32 = switch (last_two[1]) {
-                0xB9 => 1, // ¹
-                0xB2 => 2, // ²
-                0xB3 => 3, // ³
+            return switch (last_two[1]) {
+                0xB2 => .{ .digit = 2, .width = 2 },
+                0xB3 => .{ .digit = 3, .width = 2 },
+                0xB9 => .{ .digit = 1, .width = 2 },
                 else => null,
             };
-            if (exp) |e| {
-                return .{ .name = identifier[0 .. identifier.len - 2], .exponent = e };
-            }
         }
     }
-
-    // Check for 3-byte superscripts: ⁰ (0xE2 0x81 0xB0), ⁴-⁹ (0xE2 0x81 0xB4-0xB9)
-    if (identifier.len >= 3) {
-        const last_three = identifier[identifier.len - 3 ..];
+    if (text.len >= 3) {
+        const last_three = text[text.len - 3 ..];
         if (last_three[0] == 0xE2 and last_three[1] == 0x81) {
-            const exp: ?i32 = switch (last_three[2]) {
-                0xB0 => 0, // ⁰
-                0xB4 => 4, // ⁴
-                0xB5 => 5, // ⁵
-                0xB6 => 6, // ⁶
-                0xB7 => 7, // ⁷
-                0xB8 => 8, // ⁸
-                0xB9 => 9, // ⁹
+            return switch (last_three[2]) {
+                0xB0 => .{ .digit = 0, .width = 3 },
+                0xB4 => .{ .digit = 4, .width = 3 },
+                0xB5 => .{ .digit = 5, .width = 3 },
+                0xB6 => .{ .digit = 6, .width = 3 },
+                0xB7 => .{ .digit = 7, .width = 3 },
+                0xB8 => .{ .digit = 8, .width = 3 },
+                0xB9 => .{ .digit = 9, .width = 3 },
+                0xBB => .{ .digit = -1, .width = 3, .is_minus = true },
                 else => null,
             };
-            if (exp) |e| {
-                return .{ .name = identifier[0 .. identifier.len - 3], .exponent = e };
-            }
         }
     }
-
     return null;
 }

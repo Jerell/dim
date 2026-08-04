@@ -53,6 +53,8 @@ pub const Units = [_]dim.Unit{
 };
 
 const aliases = [_]dim.Alias{
+    .{ .symbol = "m2", .target = &m2 },
+    .{ .symbol = "m3", .target = &m3 },
     .{ .symbol = "Newton", .target = &N },
     .{ .symbol = "sec", .target = &s },
     .{ .symbol = "m/s2", .target = &mps2 },

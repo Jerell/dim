@@ -131,11 +131,15 @@ pub const UnitRegistry = struct {
         for (self.prefixes) |p| {
             if (std.mem.startsWith(u8, symbol, p.symbol)) {
                 const base = symbol[p.symbol.len..];
-                if (self.find(base)) |u| {
+                if (self.findExact(base)) |u| {
+                    // Prefixes only apply to multiplicative units. Carrying an
+                    // affine offset through a prefixed symbol would produce a
+                    // conversion with no physical meaning.
+                    if (u.isAffine()) continue;
                     return Unit{
                         .dim = u.dim,
                         .scale = u.scale * p.factor,
-                        .offset = u.offset,
+                        .offset = 0.0,
                         .symbol = symbol,
                     };
                 }

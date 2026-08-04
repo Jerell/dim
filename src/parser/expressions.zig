@@ -19,6 +19,7 @@ pub const RuntimeError = error{
     UndefinedVariable,
     NonRationalDimensionalExponent,
     AffineUnitExponentiation,
+    DimensionOverflow,
 };
 
 pub const LiteralValue = union(enum) {
@@ -409,7 +410,7 @@ pub const UnitExpr = struct {
         const dim_accum = if (self.exponent.eqlInt(1))
             u.dim
         else
-            Dimension.mulByRational(u.dim, self.exponent);
+            Dimension.checkedMulByRational(u.dim, self.exponent) orelse return RuntimeError.DimensionOverflow;
 
         // Compute conversion factor to canonical for this unit (raised to exponent)
         const base_factor = u.toCanonical(1.0);
@@ -472,11 +473,11 @@ pub const CompoundUnit = struct {
 
         switch (self.op.type) {
             .Star => {
-                new_dim = Dimension.add(lq.dim, rq.dim);
+                new_dim = Dimension.checkedAdd(lq.dim, rq.dim) orelse return RuntimeError.DimensionOverflow;
                 new_val = lq.value * rq.value;
             },
             .Slash => {
-                new_dim = Dimension.sub(lq.dim, rq.dim);
+                new_dim = Dimension.checkedSub(lq.dim, rq.dim) orelse return RuntimeError.DimensionOverflow;
                 new_val = lq.value / rq.value;
             },
             else => return RuntimeError.UnsupportedOperator,
@@ -585,7 +586,7 @@ fn extractExactRational(expr: *Expr) ?Rational {
         .unary => |unary| switch (unary.operator.type) {
             .Minus => {
                 const inner = extractExactRational(unary.right) orelse return null;
-                return inner.negate();
+                return inner.checkedNegate();
             },
             else => null,
         },
@@ -594,7 +595,7 @@ fn extractExactRational(expr: *Expr) ?Rational {
                 const numerator = extractExactRational(binary.left) orelse return null;
                 const denominator = extractExactRational(binary.right) orelse return null;
                 if (!numerator.isInteger() or !denominator.isInteger()) return null;
-                return Rational.div(numerator, denominator);
+                return Rational.checkedDiv(numerator, denominator);
             },
             else => null,
         },

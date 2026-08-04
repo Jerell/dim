@@ -156,6 +156,7 @@ pub fn evaluateWithContext(
 
     var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
     const tokens = scanner.scanTokens() catch return null;
+    if (scanner.hadError) return null;
     var parser = Parser.init(arena_alloc, tokens, err_writer);
     const expr = parser.parse() orelse return null;
     if (parser.hadError) return null;
@@ -468,4 +469,14 @@ test "context-scoped constants do not leak across contexts" {
         .display_quantity => |dq| try std.testing.expectApproxEqAbs(2.0, dq.value, 1e-9),
         else => return error.TestUnexpectedResult,
     }
+}
+
+test "unit lookup handles aliases and rejects prefixed affine units" {
+    const area = findUnitAll("m2") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(Dimension.eql(area.dim, Dimensions.Area));
+
+    const volume = findUnitAll("m3") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(Dimension.eql(volume.dim, Dimensions.Volume));
+
+    try std.testing.expect(findUnitAll("mC") == null);
 }

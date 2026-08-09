@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { normalizeDimSyntax } from "./normalize.mjs";
 import { instantiateWithWasi } from "./instantiate.mjs";
 
-const EVAL_RESULT_SIZE = 80;
-const QUANTITY_RESULT_SIZE = 56;
+const EVAL_RESULT_SIZE = 104;
+const QUANTITY_RESULT_SIZE = 80;
 const DIM_SLICE_SIZE = 8;
 
 const STATUS_OK = 0;
@@ -25,6 +25,7 @@ export async function createV2Runtime(wasmPath) {
     "memory",
     "dim_alloc",
     "dim_free",
+    "dim_ffi_reset",
     "dim_ctx_new",
     "dim_ctx_free",
     "dim_ctx_define",
@@ -82,13 +83,20 @@ export async function createV2Runtime(wasmPath) {
 
   function readDims(dv, offset) {
     return {
-      L: dv.getInt32(offset + 0, true),
-      M: dv.getInt32(offset + 4, true),
-      T: dv.getInt32(offset + 8, true),
-      I: dv.getInt32(offset + 12, true),
-      Th: dv.getInt32(offset + 16, true),
-      N: dv.getInt32(offset + 20, true),
-      J: dv.getInt32(offset + 24, true),
+      L: readRational(dv, offset + 0),
+      M: readRational(dv, offset + 8),
+      T: readRational(dv, offset + 16),
+      I: readRational(dv, offset + 24),
+      Th: readRational(dv, offset + 32),
+      N: readRational(dv, offset + 40),
+      J: readRational(dv, offset + 48),
+    };
+  }
+
+  function readRational(dv, offset) {
+    return {
+      num: dv.getInt32(offset, true),
+      den: dv.getUint32(offset + 4, true),
     };
   }
 
@@ -101,10 +109,10 @@ export async function createV2Runtime(wasmPath) {
     const numberValue = dv.getFloat64(16, true);
     const quantityValue = dv.getFloat64(24, true);
     const dims = readDims(dv, 32);
-    const stringPtr = dv.getUint32(60, true);
-    const stringLen = dv.getUint32(64, true);
-    const unitPtr = dv.getUint32(68, true);
-    const unitLen = dv.getUint32(72, true);
+    const stringPtr = dv.getUint32(88, true);
+    const stringLen = dv.getUint32(92, true);
+    const unitPtr = dv.getUint32(96, true);
+    const unitLen = dv.getUint32(100, true);
 
     switch (kind) {
       case KIND_NUMBER:
@@ -140,8 +148,8 @@ export async function createV2Runtime(wasmPath) {
     const isDelta = dv.getUint32(4, true) === 1;
     const value = dv.getFloat64(8, true);
     const dim = readDims(dv, 16);
-    const unitPtr = dv.getUint32(44, true);
-    const unitLen = dv.getUint32(48, true);
+    const unitPtr = dv.getUint32(72, true);
+    const unitLen = dv.getUint32(76, true);
     const unit = readString(unitPtr, unitLen);
     free(unitPtr, unitLen);
     return { value, unit, dim, isDelta, mode };
@@ -161,6 +169,7 @@ export async function createV2Runtime(wasmPath) {
     callStatus(rc, "dim_ctx_eval");
     const result = readEvalResult(outPtr);
     free(outPtr, EVAL_RESULT_SIZE);
+    exports.dim_ffi_reset();
     return result;
   }
 
@@ -181,6 +190,7 @@ export async function createV2Runtime(wasmPath) {
     callStatus(rc, "dim_ctx_convert_expr");
     const result = readQuantityResult(outPtr);
     free(outPtr, QUANTITY_RESULT_SIZE);
+    exports.dim_ffi_reset();
     return result;
   }
 
@@ -202,6 +212,7 @@ export async function createV2Runtime(wasmPath) {
     callStatus(rc, "dim_ctx_convert_value");
     const result = new DataView(exports.memory.buffer, outPtr, 8).getFloat64(0, true);
     free(outPtr, 8);
+    exports.dim_ffi_reset();
     return result;
   }
 
@@ -226,6 +237,7 @@ export async function createV2Runtime(wasmPath) {
     callStatus(rc, "dim_ctx_is_compatible");
     const result = readBool(outPtr);
     free(outPtr, 4);
+    exports.dim_ffi_reset();
     return result;
   }
 
@@ -246,6 +258,7 @@ export async function createV2Runtime(wasmPath) {
     callStatus(rc, "dim_ctx_same_dimension");
     const result = readBool(outPtr);
     free(outPtr, 4);
+    exports.dim_ffi_reset();
     return result;
   }
 
@@ -294,6 +307,7 @@ export async function createV2Runtime(wasmPath) {
     }
     free(valuesPtr, items.length * 8);
     free(statusesPtr, items.length * 4);
+    exports.dim_ffi_reset();
     return values;
   }
 
@@ -338,6 +352,7 @@ export async function createV2Runtime(wasmPath) {
     }
     free(outValuesPtr, items.length * 8);
     free(statusesPtr, items.length * 4);
+    exports.dim_ffi_reset();
     return values;
   }
 
@@ -363,16 +378,20 @@ export async function createV2Runtime(wasmPath) {
       free(nameSlice.ptr, nameSlice.len);
       free(exprSlice.ptr, exprSlice.len);
       callStatus(rc, "dim_ctx_define");
+      exports.dim_ffi_reset();
     },
     clearConst(name) {
       const slice = writeRawUtf8(name);
       exports.dim_ctx_clear(ctx, slice.ptr, slice.len);
       free(slice.ptr, slice.len);
+      exports.dim_ffi_reset();
     },
     clearAllConsts() {
       exports.dim_ctx_clear_all(ctx);
+      exports.dim_ffi_reset();
     },
     dispose() {
+      exports.dim_ffi_reset();
       exports.dim_ctx_free(ctx);
     },
   };

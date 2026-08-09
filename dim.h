@@ -163,6 +163,12 @@ extern "C"
       double *out_values,
       uint32_t *out_statuses);
 
+  /*
+   * FFI allocations are owned by one bulk-reset arena. Consume all returned
+   * pointers from the current call batch, then reset the arena. dim_free is
+   * retained as a source-compatible no-op for older callers.
+   */
+  void dim_ffi_reset(void);
   void dim_free(uint8_t *ptr, size_t len);
   uint8_t *dim_alloc(size_t n);
 

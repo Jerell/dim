@@ -10,6 +10,11 @@ const Rational = dim.Rational;
 const SiRegistry = dim.Registries.si;
 const Format = dim.Format;
 
+fn lookupUnit(context: ?*dim.DimContext, symbol: []const u8) ?dim.Unit {
+    if (context) |ctx| return dim.findUnitAllInContext(ctx, symbol);
+    return findUnitAllDynamic(symbol, null);
+}
+
 pub const RuntimeError = error{
     InvalidOperands,
     InvalidOperand,
@@ -20,6 +25,7 @@ pub const RuntimeError = error{
     NonRationalDimensionalExponent,
     AffineUnitExponentiation,
     DimensionOverflow,
+    MulDivTemperatureDelta,
 };
 
 pub const LiteralValue = union(enum) {
@@ -48,7 +54,16 @@ pub const Literal = struct {
         self: *Literal,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Literal,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
         _ = allocator;
+        _ = context;
         return self.value;
     }
 };
@@ -66,7 +81,15 @@ pub const Grouping = struct {
         self: *Grouping,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-        return self.expression.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Grouping,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        return self.expression.evaluateInContext(allocator, context);
     }
 };
 
@@ -81,7 +104,15 @@ pub const Unary = struct {
     }
 
     pub fn evaluate(self: *Unary, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
-        const rv = try self.right.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Unary,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const rv = try self.right.evaluateInContext(allocator, context);
         switch (self.operator.type) {
             .Minus => {
                 if (rv == .number) return .{ .number = -rv.number };
@@ -121,8 +152,16 @@ pub const Binary = struct {
     }
 
     pub fn evaluate(self: *Binary, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
-        const left = try self.left.evaluate(allocator);
-        const right = try self.right.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Binary,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const left = try self.left.evaluateInContext(allocator, context);
+        const right = try self.right.evaluateInContext(allocator, context);
 
         const both_numbers = (left == .number) and (right == .number);
         const both_quant = (left == .display_quantity) and (right == .display_quantity);
@@ -131,7 +170,7 @@ pub const Binary = struct {
             .Plus => {
                 if (both_numbers) return .{ .number = left.number + right.number };
                 if (both_quant) {
-                    const dq = try rt.addDisplay(left.display_quantity, right.display_quantity);
+                    const dq = try rt.addDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -139,7 +178,7 @@ pub const Binary = struct {
             .Minus => {
                 if (both_numbers) return .{ .number = left.number - right.number };
                 if (both_quant) {
-                    const dq = try rt.subDisplay(left.display_quantity, right.display_quantity);
+                    const dq = try rt.subDisplay(allocator, left.display_quantity, right.display_quantity);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -151,11 +190,11 @@ pub const Binary = struct {
                     return .{ .display_quantity = dq };
                 }
                 if (left == .display_quantity and right == .number) {
-                    const dq = rt.scaleDisplay(left.display_quantity, right.number);
+                    const dq = try rt.scaleDisplay(allocator, left.display_quantity, right.number);
                     return .{ .display_quantity = dq };
                 }
                 if (left == .number and right == .display_quantity) {
-                    const dq = rt.scaleDisplay(right.display_quantity, left.number);
+                    const dq = try rt.scaleDisplay(allocator, right.display_quantity, left.number);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -172,7 +211,7 @@ pub const Binary = struct {
                 }
                 if (left == .display_quantity and right == .number) {
                     if (right.number == 0) return RuntimeError.DivisionByZero;
-                    const dq = rt.scaleDisplay(left.display_quantity, 1.0 / right.number);
+                    const dq = try rt.scaleDisplay(allocator, left.display_quantity, 1.0 / right.number);
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperands;
@@ -247,12 +286,20 @@ pub const Unit = struct {
         self: *Unit,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-        const val = try self.value.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Unit,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const val = try self.value.evaluateInContext(allocator, context);
         if (val != .number) return RuntimeError.InvalidOperand;
 
         const num = val.number;
 
-        const unit_val = try self.unit_expr.evaluate(allocator);
+        const unit_val = try self.unit_expr.evaluateInContext(allocator, context);
         if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
         const unit_dq = unit_val.display_quantity;
 
@@ -263,7 +310,7 @@ pub const Unit = struct {
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
                 if (ue.exponent.eqlInt(1)) {
-                    const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
+                    const u = lookupUnit(context, ue.name) orelse return RuntimeError.UndefinedVariable;
                     canonical_value = u.toCanonicalValue(num, false);
                 } else {
                     canonical_value = num * unit_dq.value;
@@ -287,6 +334,7 @@ pub const Unit = struct {
             .value = canonical_value,
             .dim = unit_dq.dim,
             .unit = normalized_unit,
+            .owns_unit = true,
             .mode = .none,
             .is_delta = false,
             .value_space = .canonical,
@@ -314,13 +362,21 @@ pub const Display = struct {
         self: *Display,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-        const val = try self.expr.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Display,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const val = try self.expr.evaluateInContext(allocator, context);
         if (val != .display_quantity) return RuntimeError.InvalidOperand;
 
         const dq = val.display_quantity;
 
         // Evaluate the unit expression to a DisplayQuantity representing the target unit
-        const unit_val = try self.unit_expr.evaluate(allocator);
+        const unit_val = try self.unit_expr.evaluateInContext(allocator, context);
         if (unit_val != .display_quantity) return RuntimeError.InvalidOperand;
         const target = unit_val.display_quantity;
 
@@ -339,7 +395,7 @@ pub const Display = struct {
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
                 if (ue.exponent.eqlInt(1)) {
-                    const u = findUnitAllDynamic(ue.name, null) orelse return RuntimeError.UndefinedVariable;
+                    const u = lookupUnit(context, ue.name) orelse return RuntimeError.UndefinedVariable;
                     converted_value = u.fromCanonicalValue(source_canonical, dq.is_delta);
                     if (dq.is_delta and (std.mem.eql(u8, ue.name, "bar") or std.mem.eql(u8, ue.name, "bara") or std.mem.eql(u8, ue.name, "barg"))) {
                         output_unit = "bar";
@@ -359,6 +415,7 @@ pub const Display = struct {
             .value = converted_value,
             .dim = dq.dim,
             .unit = unit_copy,
+            .owns_unit = true,
             .mode = self.mode orelse .none,
             .is_delta = dq.is_delta,
             .value_space = .display,
@@ -377,10 +434,22 @@ pub const Assignment = struct {
     }
 
     pub fn evaluate(self: *Assignment, allocator: std.mem.Allocator) RuntimeError!LiteralValue {
-        const val = try self.value.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Assignment,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const val = try self.value.evaluateInContext(allocator, context);
         if (val != .display_quantity) return RuntimeError.InvalidOperand;
         // Define constant in runtime registry; returns void on success
-        try dim.defineConstant(self.name, val.display_quantity);
+        if (context) |ctx| {
+            try ctx.defineConstant(self.name, val.display_quantity);
+        } else {
+            try dim.defineConstant(self.name, val.display_quantity);
+        }
         // Evaluate to the right-hand value to support chaining semantics
         return val;
     }
@@ -399,8 +468,16 @@ pub const UnitExpr = struct {
         self: *UnitExpr,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *UnitExpr,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
         // Look up the unit definition
-        const u = findUnitAllDynamic(self.name, null) orelse {
+        const u = lookupUnit(context, self.name) orelse {
             return RuntimeError.UndefinedVariable;
         };
 
@@ -425,6 +502,7 @@ pub const UnitExpr = struct {
                 .dim = dim_accum,
                 // Preserve user-specified unit expression (e.g., "in^2")
                 .unit = try self.toString(allocator),
+                .owns_unit = true,
                 .mode = .none,
                 .is_delta = false,
                 .value_space = .canonical,
@@ -458,8 +536,16 @@ pub const CompoundUnit = struct {
         self: *CompoundUnit,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
-        const left_val = try self.left.evaluate(allocator);
-        const right_val = try self.right.evaluate(allocator);
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *CompoundUnit,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
+        const left_val = try self.left.evaluateInContext(allocator, context);
+        const right_val = try self.right.evaluateInContext(allocator, context);
 
         if (left_val != .display_quantity or right_val != .display_quantity) {
             return RuntimeError.InvalidOperand;
@@ -492,6 +578,7 @@ pub const CompoundUnit = struct {
                 .value = new_val,
                 .dim = new_dim,
                 .unit = unit_copy,
+                .owns_unit = true,
                 .mode = .none,
                 .is_delta = false,
                 .value_space = .canonical,
@@ -537,16 +624,24 @@ pub const Expr = union(enum) {
         self: *Expr,
         allocator: std.mem.Allocator,
     ) RuntimeError!LiteralValue {
+        return self.evaluateInContext(allocator, null);
+    }
+
+    pub fn evaluateInContext(
+        self: *Expr,
+        allocator: std.mem.Allocator,
+        context: ?*dim.DimContext,
+    ) RuntimeError!LiteralValue {
         switch (self.*) {
-            .binary => |*binary| return binary.evaluate(allocator),
-            .unary => |*unary| return unary.evaluate(allocator),
-            .literal => |*literal| return literal.evaluate(allocator),
-            .grouping => |*grouping| return grouping.evaluate(allocator),
-            .unit => |*unit| return unit.evaluate(allocator),
-            .display => |*display| return display.evaluate(allocator),
-            .compound_unit => |*cu| return cu.evaluate(allocator),
-            .unit_expr => |*ue| return ue.evaluate(allocator),
-            .assignment => |*asgn| return asgn.evaluate(allocator),
+            .binary => |*binary| return binary.evaluateInContext(allocator, context),
+            .unary => |*unary| return unary.evaluateInContext(allocator, context),
+            .literal => |*literal| return literal.evaluateInContext(allocator, context),
+            .grouping => |*grouping| return grouping.evaluateInContext(allocator, context),
+            .unit => |*unit| return unit.evaluateInContext(allocator, context),
+            .display => |*display| return display.evaluateInContext(allocator, context),
+            .compound_unit => |*cu| return cu.evaluateInContext(allocator, context),
+            .unit_expr => |*ue| return ue.evaluateInContext(allocator, context),
+            .assignment => |*asgn| return asgn.evaluateInContext(allocator, context),
         }
     }
 

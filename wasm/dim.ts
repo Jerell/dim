@@ -128,7 +128,20 @@ const KIND_BOOLEAN = 1;
 const KIND_STRING = 2;
 const KIND_QUANTITY = 3;
 const KIND_NIL = 4;
+// WASI errno value for an operation that this browser shim deliberately does
+// not implement. Returning success from these calls would make a failed file,
+// clock, or process operation look valid to the guest.
+const WASI_ERRNO_NOTSUP = 58;
 const MODES: DimFormatMode[] = ["none", "auto", "scientific", "engineering"];
+
+function unsupportedWasiOperation(): number {
+  return WASI_ERRNO_NOTSUP;
+}
+
+// The wrapper starts the guest with an intentionally empty argv/environment.
+function emptyWasiVectorGet(): number {
+  return 0;
+}
 
 let initPromise: Promise<void> | null = null;
 let runtime: DimRuntime | null = null;
@@ -158,7 +171,7 @@ function createWasiImports(
         nwrittenPtr: number,
       ) => {
         const memory = getMemory();
-        if (!memory) return 0;
+        if (!memory) return unsupportedWasiOperation();
         const dv = new DataView(memory.buffer);
         let total = 0;
         for (let i = 0; i < iovCnt; i += 1) {
@@ -170,71 +183,62 @@ function createWasiImports(
       },
       random_get: (bufPtr: number, bufLen: number) => {
         const memory = getMemory();
-        if (!memory) return 0;
+        if (!memory) return unsupportedWasiOperation();
+        if (!globalThis.crypto?.getRandomValues) return unsupportedWasiOperation();
         const out = new Uint8Array(memory.buffer, bufPtr, bufLen);
-        if (globalThis.crypto?.getRandomValues) {
-          globalThis.crypto.getRandomValues(out);
-        } else {
-          out.fill(0);
-        }
+        globalThis.crypto.getRandomValues(out);
         return 0;
       },
-      fd_close: () => 0,
-      fd_seek: () => 0,
-      fd_read: () => 0,
-      fd_pread: () => 0,
-      fd_pwrite: () => 0,
-      fd_sync: () => 0,
-      fd_fdstat_get: () => 0,
-      fd_fdstat_set_flags: () => 0,
-      fd_filestat_set_size: () => 0,
-      fd_filestat_set_times: () => 0,
-      fd_filestat_get: () => 0,
-      path_filestat_get: () => 0,
-      path_filestat_set_times: () => 0,
-      fd_prestat_get: () => 0,
-      fd_prestat_dir_name: () => 0,
-      path_open: () => 0,
-      path_link: () => 0,
-      path_create_directory: () => 0,
-      path_readlink: () => 0,
-      path_symlink: () => 0,
-      path_rename: () => 0,
-      path_remove_directory: () => 0,
-      path_unlink_file: () => 0,
-      fd_readdir: () => 0,
+      fd_close: unsupportedWasiOperation,
+      fd_seek: unsupportedWasiOperation,
+      fd_read: unsupportedWasiOperation,
+      fd_pread: unsupportedWasiOperation,
+      fd_pwrite: unsupportedWasiOperation,
+      fd_sync: unsupportedWasiOperation,
+      fd_fdstat_get: unsupportedWasiOperation,
+      fd_fdstat_set_flags: unsupportedWasiOperation,
+      fd_filestat_set_size: unsupportedWasiOperation,
+      fd_filestat_set_times: unsupportedWasiOperation,
+      fd_filestat_get: unsupportedWasiOperation,
+      path_filestat_get: unsupportedWasiOperation,
+      path_filestat_set_times: unsupportedWasiOperation,
+      fd_prestat_get: unsupportedWasiOperation,
+      fd_prestat_dir_name: unsupportedWasiOperation,
+      path_open: unsupportedWasiOperation,
+      path_link: unsupportedWasiOperation,
+      path_create_directory: unsupportedWasiOperation,
+      path_readlink: unsupportedWasiOperation,
+      path_symlink: unsupportedWasiOperation,
+      path_rename: unsupportedWasiOperation,
+      path_remove_directory: unsupportedWasiOperation,
+      path_unlink_file: unsupportedWasiOperation,
+      fd_readdir: unsupportedWasiOperation,
       environ_sizes_get: (countPtr: number, bufSizePtr: number) => {
         const memory = getMemory();
-        if (!memory) return 0;
+        if (!memory) return unsupportedWasiOperation();
         const dv = new DataView(memory.buffer);
         dv.setUint32(countPtr, 0, true);
         dv.setUint32(bufSizePtr, 0, true);
         return 0;
       },
-      environ_get: () => 0,
+      // Empty environment is a supported configuration, so these calls are
+      // no-ops after environ_sizes_get reports zero bytes.
+      environ_get: emptyWasiVectorGet,
       args_sizes_get: (argcPtr: number, argvBufSizePtr: number) => {
         const memory = getMemory();
-        if (!memory) return 0;
+        if (!memory) return unsupportedWasiOperation();
         const dv = new DataView(memory.buffer);
         dv.setUint32(argcPtr, 0, true);
         dv.setUint32(argvBufSizePtr, 0, true);
         return 0;
       },
-      args_get: () => 0,
-      clock_res_get: () => 0,
-      clock_time_get: () => 0,
-      poll_oneoff: (
-        _inPtr: number,
-        _outPtr: number,
-        _subscriptionCount: number,
-        eventCountPtr: number,
-      ) => {
-        const memory = getMemory();
-        if (!memory) return 0;
-        new DataView(memory.buffer).setUint32(eventCountPtr, 0, true);
-        return 0;
+      args_get: emptyWasiVectorGet,
+      clock_res_get: unsupportedWasiOperation,
+      clock_time_get: unsupportedWasiOperation,
+      poll_oneoff: unsupportedWasiOperation,
+      proc_exit: (code: number) => {
+        throw new Error(`WASI process exited with code ${code}`);
       },
-      proc_exit: () => 0,
     },
   };
 }

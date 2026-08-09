@@ -44,6 +44,20 @@ pub fn build(b: *std.Build) void {
     const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
+    // Compile the public package surface as an external consumer would. This
+    // catches lazy generic API and documentation examples that internal tests
+    // may never instantiate.
+    const consumer_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/consumer.zig"),
+            .target = target,
+            .imports = &.{
+                .{ .name = "dim", .module = mod },
+            },
+        }),
+    });
+    const run_consumer_tests = b.addRunArtifact(consumer_tests);
+
     // Built-in Zig fuzz tests. These run their empty-input smoke cases during
     // normal tests and can be driven with `zig build test --fuzz=N`.
     const fuzz_tests = b.addTest(.{
@@ -63,6 +77,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+    test_step.dependOn(&run_consumer_tests.step);
     test_step.dependOn(&run_fuzz_tests.step);
 
     const lib = b.addLibrary(.{

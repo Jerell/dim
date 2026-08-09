@@ -1,191 +1,109 @@
-# Using dim in Rust
+# Using dim from Rust
 
-This guide explains how to use the dim library in a Rust application.
+`dim` exposes a structured C ABI intended for Rust and other FFI consumers.
+The current surface is context-based; there are no legacy `dim_eval` or
+process-global constant functions in the shipped library.
 
-## Building the Library
-
-First, build the C-compatible static library:
+## Build the native library
 
 ```bash
 zig build -Dtarget=native -Doptimize=ReleaseFast
 ```
 
-This will create `zig-out/lib/libdim_c.a` (the C-compatible library) and `zig-out/lib/libdim.a` (the Zig module library).
+This creates `zig-out/lib/libdim_c.a` (or the platform equivalent) and the
+matching header at `dim.h`.
 
-## Rust Integration
+## Link from Cargo
 
-### Option 1: Using build.rs (Recommended)
-
-1. Copy `libdim_c.a` and `dim.h` to your Rust project (e.g., in a `vendor/` directory).
-
-2. Create a `build.rs` file in your Rust project root:
+Copy `libdim_c.a` and `dim.h` into a `vendor/` directory and add a build script:
 
 ```rust
-use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    // Tell cargo where to find the static library
-    let lib_dir = PathBuf::from("vendor");
-    println!("cargo:rustc-link-search=native={}", lib_dir.display());
+    let vendor = PathBuf::from("vendor");
+    println!("cargo:rustc-link-search=native={}", vendor.display());
     println!("cargo:rustc-link-lib=static=dim_c");
-
-    // Tell cargo to invalidate the built crate whenever the library changes
     println!("cargo:rerun-if-changed=vendor/libdim_c.a");
     println!("cargo:rerun-if-changed=vendor/dim.h");
 }
 ```
 
-3. Generate Rust bindings using `bindgen`:
+Generate Rust declarations with `bindgen` using `vendor/dim.h` as the input.
 
-Add to your `Cargo.toml`:
+## Context wrapper
 
-```toml
-[build-dependencies]
-bindgen = "0.69"
-
-[dependencies]
-libc = "0.2"
-```
-
-Update your `build.rs`:
+The important operations are `dim_ctx_new`, `dim_ctx_define`, `dim_ctx_eval`,
+the direct conversion/compatibility functions, and `dim_ctx_free`:
 
 ```rust
-use std::env;
-use std::path::PathBuf;
-
-fn main() {
-    // Tell cargo where to find the static library
-    let lib_dir = PathBuf::from("vendor");
-    println!("cargo:rustc-link-search=native={}", lib_dir.display());
-    println!("cargo:rustc-link-lib=static=dim_c");
-
-    // Generate bindings
-    let bindings = bindgen::Builder::default()
-        .header("vendor/dim.h")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .generate()
-        .expect("Unable to generate bindings");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
-
-    println!("cargo:rerun-if-changed=vendor/libdim_c.a");
-    println!("cargo:rerun-if-changed=vendor/dim.h");
-}
-```
-
-4. Create a Rust wrapper module:
-
-```rust
-// src/dim.rs
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-
+// These names are generated from dim.h by bindgen.
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_uint};
+pub struct Context {
+    raw: *mut DimContext,
+}
 
-pub struct DimError;
+#[derive(Debug)]
+pub struct DimError(i32);
 
-pub fn eval(input: &str) -> Result<String, DimError> {
-    let input_bytes = input.as_bytes();
-    let mut out_ptr: *mut u8 = std::ptr::null_mut();
-    let mut out_len: usize = 0;
-
-    let result = unsafe {
-        dim_eval(
-            input_bytes.as_ptr(),
-            input_bytes.len(),
-            &mut out_ptr,
-            &mut out_len,
-        )
-    };
-
-    if result != 0 {
-        return Err(DimError);
+impl Context {
+    pub fn new() -> Result<Self, DimError> {
+        let raw = unsafe { dim_ctx_new() };
+        if raw.is_null() {
+            return Err(DimError(DIM_STATUS_OUT_OF_MEMORY));
+        }
+        Ok(Self { raw })
     }
 
-    unsafe {
-        let slice = std::slice::from_raw_parts(out_ptr, out_len);
-        let string = String::from_utf8_lossy(slice).to_string();
-        dim_free(out_ptr, out_len);
-        Ok(string)
+    pub fn eval(&mut self, input: &[u8]) -> Result<DimEvalResult, DimError> {
+        let mut result = unsafe { std::mem::zeroed::<DimEvalResult>() };
+        let rc = unsafe {
+            dim_ctx_eval(
+                self.raw,
+                input.as_ptr(),
+                input.len(),
+                &mut result,
+            )
+        };
+        if rc != DIM_STATUS_OK {
+            return Err(DimError(rc));
+        }
+
+        Ok(result)
+    }
+
+    pub fn reset_arena(&mut self) {
+        unsafe { dim_ffi_reset() }
     }
 }
 
-pub fn define(name: &str, expr: &str) -> Result<(), DimError> {
-    let name_bytes = name.as_bytes();
-    let expr_bytes = expr.as_bytes();
-
-    let result = unsafe {
-        dim_define(
-            name_bytes.as_ptr(),
-            name_bytes.len(),
-            expr_bytes.as_ptr(),
-            expr_bytes.len(),
-        )
-    };
-
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(DimError)
-    }
-}
-
-pub fn clear(name: &str) {
-    let name_bytes = name.as_bytes();
-    unsafe {
-        dim_clear(name_bytes.as_ptr(), name_bytes.len());
-    }
-}
-
-pub fn clear_all() {
-    unsafe {
-        dim_clear_all();
+impl Drop for Context {
+    fn drop(&mut self) {
+        unsafe { dim_ctx_free(self.raw) };
     }
 }
 ```
 
-5. Use it in your Rust code:
+The example shows the lifetime boundary, but a production wrapper should copy
+`string_ptr` and `unit_ptr` into owned Rust `String`s before calling
+`dim_ffi_reset`. `DimEvalResult` also carries exact rational dimension pairs,
+so callers should not assume all exponents have denominator `1`.
 
-```rust
-// src/main.rs
-mod dim;
+For repeated workloads, prefer `dim_ctx_batch_convert_exprs` and
+`dim_ctx_batch_convert_values`; each item returns a status alongside its
+numeric output.
 
-fn main() {
-    match dim::eval("2 + 2") {
-        Ok(result) => println!("Result: {}", result),
-        Err(_) => println!("Error evaluating expression"),
-    }
+## Memory rules
 
-    dim::define("pi", "3.14159").unwrap();
-    match dim::eval("pi * 2") {
-        Ok(result) => println!("Result: {}", result),
-        Err(_) => println!("Error evaluating expression"),
-    }
-}
-```
+- Input slices are borrowed only for the duration of the call.
+- Result strings and unit symbols live in the calling thread's FFI arena.
+- Copy result bytes before calling `dim_ffi_reset`.
+- `dim_free` remains in the header for source compatibility but is a no-op in
+  the arena-based ABI.
+- A `DimContext` owns its constants and must be released with
+  `dim_ctx_free`.
 
-### Option 2: Using a Cargo Build Script with System Library
-
-If you install the library system-wide, you can use:
-
-```rust
-// build.rs
-fn main() {
-    println!("cargo:rustc-link-lib=static=dim_c");
-}
-```
-
-## Notes
-
-- The library uses `page_allocator` for memory returned by `dim_eval`, so you must call `dim_free` to avoid memory leaks.
-- All string parameters are passed as byte slices with explicit lengths (no null terminators required).
-- Error handling: functions return `0` on success, non-zero on failure.
-
+The context API is isolated by default. Do not share one context across
+threads without external synchronization; create one context per concurrent
+worker instead.

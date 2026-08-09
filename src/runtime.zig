@@ -17,7 +17,11 @@ pub const ValueSpace = enum {
 pub const DisplayQuantity = struct {
     value: f64,
     dim: Dimension,
-    unit: []const u8, // preferred display unit symbol (owned string)
+    unit: []const u8, // preferred display unit symbol
+    // Values returned by the evaluator and runtime helpers own their unit
+    // string. Struct literals remain borrowed by default, which makes the
+    // public type safe to construct with string literals.
+    owns_unit: bool = false,
     mode: Format.FormatMode = .none,
     is_delta: bool = false,
     value_space: ValueSpace = .canonical,
@@ -86,38 +90,45 @@ pub const DisplayQuantity = struct {
         return self.value;
     }
 
+    /// Release an owned result. Treat an owned value as move-only until this
+    /// call; borrowed struct literals are safe no-ops.
     pub fn deinit(self: *DisplayQuantity, allocator: std.mem.Allocator) void {
-        allocator.free(self.unit);
+        if (self.owns_unit) allocator.free(self.unit);
         self.* = undefined;
     }
 };
 
-pub fn scaleDisplay(dq: DisplayQuantity, factor: f64) DisplayQuantity {
+pub fn scaleDisplay(allocator: std.mem.Allocator, dq: DisplayQuantity, factor: f64) !DisplayQuantity {
     return DisplayQuantity{
         .value = dq.value * factor,
         .dim = dq.dim,
-        .unit = dq.unit,
+        .unit = try allocator.dupe(u8, dq.unit),
+        .owns_unit = true,
         .mode = dq.mode,
         .is_delta = dq.is_delta,
         .value_space = dq.value_space,
     };
 }
 
-pub fn addDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}!DisplayQuantity {
+pub fn addDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     const canonical_value = a.canonicalValue() + b.canonicalValue();
     const result_is_delta = inferAddDeltaState(a.dim, a.is_delta, b.is_delta);
-    return displayResultFromCanonical(canonical_value, a.dim, a.unit, a.mode, result_is_delta);
+    return displayResultFromCanonical(allocator, canonical_value, a.dim, a.unit, a.mode, result_is_delta);
 }
 
-pub fn subDisplay(a: DisplayQuantity, b: DisplayQuantity) error{InvalidOperands}!DisplayQuantity {
+pub fn subDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     const canonical_value = a.canonicalValue() - b.canonicalValue();
     const result_is_delta = inferSubDeltaState(a.dim, a.is_delta, b.is_delta);
-    return displayResultFromCanonical(canonical_value, a.dim, a.unit, a.mode, result_is_delta);
+    return displayResultFromCanonical(allocator, canonical_value, a.dim, a.unit, a.mode, result_is_delta);
 }
 
 pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
+    if ((isTemperatureDim(a.dim) and a.is_delta) or
+        (isTemperatureDim(b.dim) and b.is_delta))
+        return error.MulDivTemperatureDelta;
+
     const new_dim = Dimension.checkedAdd(a.dim, b.dim) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}*{s}", .{ a.unit, b.unit });
@@ -133,6 +144,7 @@ pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
         .value = a.canonicalValue() * b.canonicalValue(),
         .dim = new_dim,
         .unit = normalized_unit,
+        .owns_unit = true,
         .mode = .none,
         .is_delta = false,
         .value_space = .canonical,
@@ -140,6 +152,10 @@ pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
+    if ((isTemperatureDim(a.dim) and a.is_delta) or
+        (isTemperatureDim(b.dim) and b.is_delta))
+        return error.MulDivTemperatureDelta;
+
     const new_dim = Dimension.checkedSub(a.dim, b.dim) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ a.unit, b.unit });
@@ -155,6 +171,7 @@ pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
         .value = a.canonicalValue() / b.canonicalValue(),
         .dim = new_dim,
         .unit = normalized_unit,
+        .owns_unit = true,
         .mode = .none,
         .is_delta = false,
         .value_space = .canonical,
@@ -178,6 +195,7 @@ pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: 
         .value = std.math.pow(f64, a.canonicalValue(), exponent),
         .dim = new_dim,
         .unit = normalized_unit,
+        .owns_unit = true,
         .mode = .none,
         .is_delta = false,
         .value_space = .canonical,
@@ -203,6 +221,7 @@ pub fn powDisplayRational(allocator: std.mem.Allocator, a: DisplayQuantity, exp:
         .value = std.math.pow(f64, a.canonicalValue(), exp.toF64()),
         .dim = new_dim,
         .unit = normalized_unit,
+        .owns_unit = true,
         .mode = .none,
         .is_delta = false,
         .value_space = .canonical,
@@ -257,12 +276,13 @@ fn inferSubDeltaState(dim: Dimension, lhs_is_delta: bool, rhs_is_delta: bool) bo
 }
 
 fn displayResultFromCanonical(
+    allocator: std.mem.Allocator,
     canonical_value: f64,
     dim: Dimension,
     preferred_unit: []const u8,
     mode: Format.FormatMode,
     is_delta: bool,
-) DisplayQuantity {
+) !DisplayQuantity {
     const result_unit = if (is_delta and isPressureDim(dim) and isPressureBarFamilySymbol(preferred_unit))
         "bar"
     else
@@ -272,7 +292,8 @@ fn displayResultFromCanonical(
         return .{
             .value = u.fromCanonicalValue(canonical_value, is_delta),
             .dim = dim,
-            .unit = result_unit,
+            .unit = try allocator.dupe(u8, result_unit),
+            .owns_unit = true,
             .mode = mode,
             .is_delta = is_delta,
             .value_space = .display,
@@ -282,7 +303,8 @@ fn displayResultFromCanonical(
     return .{
         .value = canonical_value,
         .dim = dim,
-        .unit = result_unit,
+        .unit = try allocator.dupe(u8, result_unit),
+        .owns_unit = true,
         .mode = mode,
         .is_delta = is_delta,
         .value_space = .canonical,

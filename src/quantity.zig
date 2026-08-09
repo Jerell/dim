@@ -5,9 +5,7 @@ const UnitRegistry = @import("unit.zig").UnitRegistry;
 const Unit = @import("unit.zig").Unit;
 const Format = @import("format.zig");
 
-const QuantityError = error{
-    AbsPlusAbsTemperature,
-    DeltaMinusAbsTemperature,
+pub const QuantityError = error{
     MulDivTemperatureDelta,
 };
 
@@ -135,35 +133,62 @@ pub fn Quantity(comptime Dim: Dimension) type {
             }
         }
 
-        pub fn mul(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
-            const Other = @TypeOf(other);
-            const OtherDim = comptime quantityDim(Other);
-            // Conservative rule: forbid multiplying if either operand is a temperature delta.
-            if ((comptime isTemperatureDim(Dim) and self.is_delta) or
-                (comptime isTemperatureDim(OtherDim) and other.is_delta))
+        /// Multiply quantities, rejecting affine temperature deltas.
+        /// The delta marker is runtime state, so this safety check returns an
+        /// error rather than using @compileError; dimension/type checks remain
+        /// compile-time enforced.
+        pub fn mul(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
+            const OtherDim = comptime quantityDim(@TypeOf(other));
+            if ((isTemperatureDim(Dim) and self.is_delta) or
+                (isTemperatureDim(OtherDim) and other.is_delta))
             {
-                @compileError("Multiplying temperature deltas is not supported.");
+                return error.MulDivTemperatureDelta;
             }
+            return self.mulUnchecked(other);
+        }
+
+        /// Compatibility alias for callers that prefer an explicit name.
+        pub fn mulChecked(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
+            return self.mul(other);
+        }
+
+        /// Unchecked multiply for callers that have already established that
+        /// both operands are multiplicative quantities.
+        pub fn mulUnchecked(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
             return .{ .value = self.value * other.value, .is_delta = false };
         }
 
-        pub fn div(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
-            const Other = @TypeOf(other);
-            const OtherDim = comptime quantityDim(Other);
-            if ((comptime isTemperatureDim(Dim) and self.is_delta) or
-                (comptime isTemperatureDim(OtherDim) and other.is_delta))
+        /// Divide quantities, rejecting affine temperature deltas.
+        /// The delta marker is runtime state, so this safety check returns an
+        /// error rather than using @compileError; dimension/type checks remain
+        /// compile-time enforced.
+        pub fn div(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
+            const OtherDim = comptime quantityDim(@TypeOf(other));
+            if ((isTemperatureDim(Dim) and self.is_delta) or
+                (isTemperatureDim(OtherDim) and other.is_delta))
             {
-                @compileError("Dividing temperature deltas is not supported.");
+                return error.MulDivTemperatureDelta;
             }
+            return self.divUnchecked(other);
+        }
+
+        /// Compatibility alias for callers that prefer an explicit name.
+        pub fn divChecked(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
+            return self.div(other);
+        }
+
+        /// Unchecked divide for callers that have already established that
+        /// both operands are multiplicative quantities.
+        pub fn divUnchecked(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
             return .{ .value = self.value / other.value, .is_delta = false };
         }
 
         pub fn scale(self: Quantity(Dim), k: f64) Quantity(Dim) {
-            return .{ .value = self.value * k };
+            return .{ .value = self.value * k, .is_delta = self.is_delta };
         }
 
         pub fn unscale(self: Quantity(Dim), k: f64) Quantity(Dim) {
-            return .{ .value = self.value / k };
+            return .{ .value = self.value / k, .is_delta = self.is_delta };
         }
 
         pub fn powInt(self: Quantity(Dim), comptime exponent: i32) Quantity(Dimension.mulByInt(Dim, exponent)) {

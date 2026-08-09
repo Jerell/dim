@@ -25,11 +25,22 @@ jobs:
         with:
           version: 0.16.0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Run tests
         run: zig build test
 
+      - name: Compile C header consumer
+        run: zig cc -std=c11 -I. -c tests/header_consumer.c -o "$RUNNER_TEMP/dim-header-consumer.o"
+
       - name: Build WebAssembly artifact
         run: zig build wasm -Doptimize=ReleaseSmall
+
+      - name: Test TypeScript WASM wrapper
+        run: node --experimental-strip-types tests/wasm_wrapper.test.mjs
 
   build-native:
     strategy:

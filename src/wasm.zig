@@ -2,7 +2,7 @@ const std = @import("std");
 const dim = @import("dim");
 
 // ---------------------------------------------------------------------------
-// FFI arena – single arena for all allocations that cross the JS ↔ WASM
+// FFI arena – one arena per calling thread for allocations that cross the JS ↔ WASM
 // boundary (input strings written by JS, output strings read by JS, and
 // temporary expression strings built inside exported functions).
 //
@@ -11,7 +11,9 @@ const dim = @import("dim");
 // and keeps WASM linear-memory usage bounded regardless of how long the
 // process runs.
 // ---------------------------------------------------------------------------
-var ffi_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+// Keep the FFI scratch arena thread-local. Contexts are explicit, and making
+// the arena thread-local preserves that isolation for native C callers too.
+threadlocal var ffi_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 
 fn ffiAllocator() std.mem.Allocator {
     return ffi_arena.allocator();

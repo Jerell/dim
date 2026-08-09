@@ -55,12 +55,8 @@ $ dim "1 bar as kPa"
 ```zig
 const std = @import("std");
 const dim = @import("dim");
-const Io = @import("./io.zig").Io;
 
 pub fn main() !void {
-    var io = Io.init();
-    defer io.flushAll() catch |e| std.debug.print("flush error: {s}\n", .{@errorName(e)});
-
     const Si = dim.Units.si;
     const Length = dim.Quantity(dim.Dimensions.Length);
     const Time = dim.Quantity(dim.Dimensions.Time);
@@ -77,30 +73,37 @@ pub fn main() !void {
     // quantities from runtime units (dimension checked at runtime)
     const km = dim.findUnitAll("km").?;
     const d2 = try Length.fromDynamic(100.0, km); // 100 km
+    _ = .{ d0, t0, d1b, d2 };
 
     // typed arithmetic — v is Quantity(Velocity)
-    const v = d1.div(t1);
+    const v = try d1.div(t1);
 
     // print with default formatting
-    try io.printf("speed: {f} m/s\n", .{v});
+    std.debug.print("speed: {f} m/s\n", .{v});
     // print with a unit registry and formatting mode
-    try io.printf("speed: {f}\n", .{v.with(dim.Registries.si, .scientific)});
-    // print in a specific compound unit
+    std.debug.print("speed: {f}\n", .{v.with(dim.Registries.si, .scientific)});
+    // convert to a specific compound unit
     const h = dim.findUnitAll("h").?;
     const kmh = km.div(h, "km/h");
-    try io.printf("speed: {f}\n", .{v.asUnit(kmh, .none)});
 
     // or keep the runtime check when units may be affine
     const safe_kmh = try km.divChecked(h, "km/h");
-    try io.printf("speed: {f}\n", .{v.asUnit(safe_kmh, .none)});
+    _ = kmh;
+    std.debug.print("speed: {d} km/h\n", .{safe_kmh.fromCanonicalValue(v.value, false)});
 
     // evaluate string expressions
     const allocator = std.heap.page_allocator;
     if (dim.evaluate(allocator, "100 km/h as m/s", null)) |result| {
-        try io.printf("result: {f}\n", .{result.display_quantity});
+        var owned_result = result;
+        defer dim.deinitLiteralValue(allocator, &owned_result);
+        std.debug.print("result: {f}\n", .{owned_result.display_quantity});
     }
 }
 ```
+
+`Quantity.mul` and `Quantity.div` reject affine temperature deltas with
+`error.MulDivTemperatureDelta`. Use `mulUnchecked` or `divUnchecked` only when
+the caller has already established that both operands are multiplicative.
 
 ### CLI
 
@@ -159,94 +162,41 @@ The repo-owned TypeScript wrapper shipped with the WASM release bundle lives at 
 
 ### Exports
 
-- `dim_eval(input_ptr, input_len, out_ptr_ptr, out_len_ptr) -> i32` (0 = ok)
-- `dim_define(name_ptr, name_len, expr_ptr, expr_len) -> i32` (0 = ok)
-- `dim_clear(name_ptr, name_len) -> void`
-- `dim_clear_all() -> void`
-- `dim_alloc(n) -> u8*` (returns module-owned memory)
-- `dim_free(ptr, len) -> void` (free memory allocated by the module)
+The current ABI is context-based and returns structured values:
 
-`dim_eval` returns an owned UTF-8 string; you must free it with `dim_free`.
+- `dim_ctx_new` / `dim_ctx_free`
+- `dim_ctx_define`, `dim_ctx_clear`, `dim_ctx_clear_all`
+- `dim_ctx_eval`
+- `dim_ctx_convert_expr`, `dim_ctx_convert_value`
+- `dim_ctx_is_compatible`, `dim_ctx_same_dimension`
+- `dim_ctx_batch_convert_exprs`, `dim_ctx_batch_convert_values`
+- `dim_alloc`, `dim_ffi_reset`, and `dim_free`
 
-### Browser example (WASI polyfill)
+The shipped [`wasm/dim.ts`](wasm/dim.ts) wrapper exposes these as
+`evalStructured`, `convertExpr`, `convertValue`, `isCompatible`,
+`sameDimension`, batch conversion helpers, and context constant helpers.
+Dimension components are exact `{ num, den }` rational pairs.
 
-Below is a minimal example using `@wasmer/wasi` for WASI bindings in the browser:
+All strings and scratch buffers returned through the ABI belong to the calling
+thread's FFI arena. Copy any string or unit you need, then call
+`dim_ffi_reset` after the current batch of results has been consumed.
+`dim_free` is retained as a source-compatible no-op for older callers.
 
-```js
-import { init, WASI } from "@wasmer/wasi";
-import browserBindings from "@wasmer/wasi/lib/bindings/browser";
+### Browser example
 
-// 1) Load WASI runtime (required) and instantiate the module
-await init();
-const wasi = new WASI({ bindings: browserBindings });
+```ts
+import { evalStructured, formatEvalResult, initDim } from "./dim";
 
-const moduleBytes = fetch("zig-out/bin/dim_wasm.wasm");
-const module = await WebAssembly.compileStreaming(moduleBytes);
-const instance = await wasi.instantiate(module, {});
-wasi.start(instance);
-
-const { memory, dim_alloc, dim_free, dim_eval, dim_define } = instance.exports;
-const enc = new TextEncoder();
-const dec = new TextDecoder();
-
-function writeUtf8(str) {
-  const bytes = enc.encode(str);
-  const ptr = dim_alloc(bytes.length);
-  new Uint8Array(memory.buffer, ptr, bytes.length).set(bytes);
-  return { ptr, len: bytes.length };
-}
-
-function readBytes(ptr, len) {
-  return new Uint8Array(memory.buffer, ptr, len);
-}
-
-async function evalDim(expr) {
-  const { ptr: inPtr, len: inLen } = writeUtf8(expr);
-  const scratch = dim_alloc(8 /* out_ptr */ + 8 /* out_len */);
-
-  // In wasm32-wasi, usize is 4 bytes. We'll treat out slots as 4 + 4.
-  const outPtrPtr = scratch;
-  const outLenPtr = scratch + 4;
-
-  const rc = dim_eval(inPtr, inLen, outPtrPtr, outLenPtr);
-  dim_free(inPtr, inLen);
-  if (rc !== 0) {
-    dim_free(scratch, 8);
-    throw new Error("dim_eval failed");
-  }
-
-  const dv = new DataView(memory.buffer);
-  const outPtr = dv.getUint32(outPtrPtr, true);
-  const outLen = dv.getUint32(outLenPtr, true);
-  dim_free(scratch, 8);
-
-  const outBytes = readBytes(outPtr, outLen);
-  const outStr = dec.decode(outBytes);
-  dim_free(outPtr, outLen);
-  return outStr;
-}
-
-async function defineConst(name, expr) {
-  const n = writeUtf8(name);
-  const v = writeUtf8(expr);
-  const rc = dim_define(n.ptr, n.len, v.ptr, v.len);
-  dim_free(n.ptr, n.len);
-  dim_free(v.ptr, v.len);
-  if (rc !== 0) throw new Error("dim_define failed");
-}
-
-// Examples
-console.log(await evalDim("1 m"));
-console.log(await evalDim("2 m * 3 m"));
-await defineConst("c", "299792458 m/s");
-console.log(await evalDim("c as m/s"));
+await initDim({ wasmUrl: "./dim_wasm.wasm" });
+const result = evalStructured("100 km/h as m/s");
+console.log(formatEvalResult(result)); // 27.77777777777778 m/s
 ```
 
-Notes:
-
-- Returned strings are module-owned; always free them with `dim_free(ptr, len)`.
-- `dim_define(name, value_expr)` lets you create constants usable in expressions (e.g. `d = (24 h)` is equivalent to calling `dim_define("d", "24 h")`).
-- The expression grammar is the same as the CLI (supports `as`, compound units, arithmetic, and formatting modes like `:engineering`).
+The wrapper includes the minimal `wasi_snapshot_preview1` imports required by
+the current `wasm32-wasi` artifact. Raw instantiation must provide the same
+imports; an empty import object is not sufficient for this build.
+The browser shim intentionally reports WASI `ENOTSUP` for filesystem, clock,
+and polling operations it does not implement, rather than returning success.
 
 ### Testing and Fuzzing
 
@@ -255,6 +205,10 @@ Run the complete test suite with:
 ```bash
 zig build test
 ```
+
+The suite includes library, CLI, fuzz smoke, external-consumer, and WASM ABI
+contract coverage. CI additionally compiles a C header consumer and exercises
+the shipped TypeScript wrapper against the generated module.
 
 The test suite also includes a built-in Zig fuzz target for arbitrary
 expressions, REPL sessions, and unit expressions. Run a bounded fuzz pass with:
@@ -266,26 +220,6 @@ just fuzz 10000
 
 Fuzzing uses Zig 0.16's `std.testing.fuzz`; malformed input is expected to
 return an error, not crash the parser or evaluator.
-
-### Minimal loader (no WASI required)
-
-The exported functions do not depend on WASI. You can instantiate with an empty import object:
-
-```js
-// Browser
-const mod = await WebAssembly.compileStreaming(
-  fetch("zig-out/bin/dim_wasm.wasm")
-);
-const { exports } = await WebAssembly.instantiate(mod, {});
-
-// Node
-import { readFile } from "node:fs/promises";
-const bytes = await readFile("zig-out/bin/dim_wasm.wasm");
-const mod = await WebAssembly.compile(bytes);
-const { exports } = await WebAssembly.instantiate(mod, {});
-
-// exports contains: memory, dim_eval, dim_define, dim_clear, dim_clear_all, dim_alloc, dim_free
-```
 
 ---
 

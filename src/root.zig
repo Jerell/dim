@@ -3,6 +3,7 @@ const std = @import("std");
 pub const Dimension = @import("dimension.zig").Dimension;
 pub const Rational = @import("rational.zig").Rational;
 pub const Quantity = @import("quantity.zig").Quantity;
+pub const QuantityError = @import("quantity.zig").QuantityError;
 pub const Dimensions = @import("dimension.zig").Dimensions;
 pub const Unit = @import("unit.zig").Unit;
 pub const Alias = @import("unit.zig").Alias;
@@ -39,6 +40,8 @@ pub const ConstantEntry = struct {
     unit: Unit,
 };
 
+/// A context owns its constants and scratch storage. Give each concurrent
+/// worker its own context, or protect shared contexts externally.
 pub const DimContext = struct {
     constants_arena: std.heap.ArenaAllocator,
     scratch_arena: std.heap.ArenaAllocator,
@@ -126,11 +129,13 @@ pub const DimContext = struct {
     }
 };
 
-var _default_context = DimContext.init(std.heap.page_allocator);
-var _active_context: ?*DimContext = null;
+// Explicit contexts are the canonical path for embedders. The convenience API
+// gets one default context per thread, avoiding cross-thread races while
+// preserving the simple CLI-style surface.
+threadlocal var _default_context = DimContext.init(std.heap.page_allocator);
 
 fn currentContext() *DimContext {
-    return _active_context orelse &_default_context;
+    return &_default_context;
 }
 
 pub fn deinitLiteralValue(allocator: std.mem.Allocator, value: *LiteralValue) void {
@@ -148,10 +153,6 @@ pub fn evaluateWithContext(
     source: []const u8,
     err_writer: ?*std.Io.Writer,
 ) ?LiteralValue {
-    const previous_ctx = _active_context;
-    _active_context = ctx;
-    defer _active_context = previous_ctx;
-
     const arena_alloc = ctx.scratchAllocator();
 
     var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
@@ -164,13 +165,14 @@ pub fn evaluateWithContext(
         reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
         return null;
     }
-    const result = expr.evaluate(arena_alloc) catch return null;
+    const result = expr.evaluateInContext(arena_alloc, ctx) catch return null;
 
     return switch (result) {
         .display_quantity => |dq| LiteralValue{ .display_quantity = .{
             .value = dq.value,
             .dim = dq.dim,
             .unit = result_allocator.dupe(u8, dq.unit) catch return null,
+            .owns_unit = true,
             .mode = dq.mode,
             .is_delta = dq.is_delta,
             .value_space = dq.value_space,
@@ -181,6 +183,8 @@ pub fn evaluateWithContext(
 }
 
 /// Evaluate a string expression. Returns null on parse/eval errors.
+/// This convenience form uses the calling thread's default context. Embedders
+/// that need isolation or concurrency should use `evaluateWithContext`.
 /// Pass an error writer to receive error messages, or null to discard them.
 /// The returned LiteralValue (if .display_quantity) has its .unit string
 /// allocated with the provided allocator. All intermediate scanner/parser
@@ -215,28 +219,19 @@ pub fn constantByIndex(index: usize) ?ConstantEntry {
 
 /// Search across all built-in registries
 pub fn findUnitAll(symbol: []const u8) ?Unit {
-    // 0. Constants first
-    if (getConstant(symbol)) |u_const| return u_const;
-
-    // 1. First pass: exact/alias matches only (prevents prefix greed across registries)
-    if (_si.Registry.findExact(symbol)) |u| return u;
-    if (_imperial.Registry.findExact(symbol)) |u| return u;
-    if (_cgs.Registry.findExact(symbol)) |u| return u;
-    if (_industrial.Registry.findExact(symbol)) |u| return u;
-
-    // 2. Second pass: with prefix expansion
-    if (_si.Registry.find(symbol)) |u| return u;
-    if (_imperial.Registry.find(symbol)) |u| return u;
-    if (_cgs.Registry.find(symbol)) |u| return u;
-    if (_industrial.Registry.find(symbol)) |u| return u;
-
-    return null;
+    return findUnitAllDynamicInContext(currentContext(), symbol, null);
 }
 
-/// Search across built-in registries + optional user-supplied registries
-pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const UnitRegistry) ?Unit {
-    // Search constants first
-    if (getConstant(symbol)) |u| return u;
+/// Search across all built-in registries using an explicit context. Constants
+/// are read from `ctx`, so context-scoped evaluation never needs a global
+/// mutable active-context pointer.
+pub fn findUnitAllInContext(ctx: *DimContext, symbol: []const u8) ?Unit {
+    return findUnitAllDynamicInContext(ctx, symbol, null);
+}
+
+pub fn findUnitAllDynamicInContext(ctx: *DimContext, symbol: []const u8, extra: ?[]const UnitRegistry) ?Unit {
+    // 0. Constants first
+    if (ctx.getConstant(symbol)) |u_const| return u_const;
 
     // 1. First pass: exact/alias matches only (prevents prefix greed across registries)
     if (_si.Registry.findExact(symbol)) |u| return u;
@@ -263,8 +258,22 @@ pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const UnitRegistry) ?Uni
     return null;
 }
 
+/// Search across built-in registries + optional user-supplied registries
+pub fn findUnitAllDynamic(symbol: []const u8, extra: ?[]const UnitRegistry) ?Unit {
+    return findUnitAllDynamicInContext(currentContext(), symbol, extra);
+}
+
 /// Re-export ergonomic constructors
 pub const Units = struct {
+    // Named comptime unit namespaces (`dim.Units.si.km`, etc.).
+    pub const si = _si;
+    pub const imperial = _imperial;
+    pub const cgs = _cgs;
+    pub const industrial = _industrial;
+};
+
+/// Raw unit arrays for callers that need to iterate over a registry.
+pub const UnitLists = struct {
     pub const si = _si.Units;
     pub const imperial = _imperial.Units;
     pub const cgs = _cgs.Units;
@@ -286,13 +295,24 @@ test "basic dimensional arithmetic" {
 
     const d = LengthQ.init(100.0); // 100 m
     const t = TimeQ.init(10.0); // 10 s
-    const v = d.div(t);
+    const v = try d.div(t);
 
     try std.testing.expectApproxEqAbs(10.0, v.value, 1e-9);
     comptime {
         const ResultQ = @TypeOf(v);
         _ = @as(SpeedQ, ResultQ{ .value = 0.0, .is_delta = false });
     }
+}
+
+test "public quantity scalar operations preserve delta state" {
+    const LengthQ = Quantity(Dimensions.Length);
+    const length = LengthQ.init(2.0).scale(3.0).unscale(2.0);
+    try std.testing.expectApproxEqAbs(3.0, length.value, 1e-9);
+
+    const TempQ = Quantity(Dimensions.Temperature);
+    const delta = (TempQ{ .value = 10.0, .is_delta = true }).scale(2.0);
+    try std.testing.expect(delta.is_delta);
+    try std.testing.expectError(error.MulDivTemperatureDelta, delta.mulChecked(LengthQ.init(1.0)));
 }
 
 test "force = mass * acceleration" {
@@ -302,7 +322,7 @@ test "force = mass * acceleration" {
 
     const m = MassQ.init(2.0); // 2 kg
     const a = AccelQ.init(9.81); // 9.81 m/s^2
-    const f = m.mul(a);
+    const f = try m.mul(a);
 
     comptime {
         const ResultQ = @TypeOf(f);

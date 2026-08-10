@@ -7,6 +7,7 @@ import {
   formatEvalResult,
   initDim,
   isCompatible,
+  recoverDim,
 } from "../wasm/dim.ts";
 
 const wasmBytes = await readFile("zig-out/bin/dim_wasm.wasm");
@@ -33,4 +34,13 @@ if (batch[0] !== 100000 || batch[1] !== 2000) {
 }
 
 clearAllConsts();
+
+const wasmBase64 = (
+  await readFile("registry/assets/dim_wasm.wasm.base64", "utf8")
+).trim();
+await recoverDim({ wasmBase64 });
+if (convertValue(1, "km", "m") !== 1000) {
+  throw new Error("base64 WASM initialization failed");
+}
+
 console.log(formatEvalResult(quantity));

@@ -3,6 +3,12 @@
 .zig-global-cache/
 zig-out/
 
+# React registry tooling and generated sites
+node_modules/
+public/
+storybook-static/
+coverage/
+
 # IDE/editor files
 .vscode/
 .idea/

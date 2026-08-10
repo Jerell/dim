@@ -198,6 +198,90 @@ imports; an empty import object is not sufficient for this build.
 The browser shim intentionally reports WASI `ENOTSUP` for filesystem, clock,
 and polling operations it does not implement, rather than returning success.
 
+The wrapper can also initialize from `{ wasmBase64 }`. Its automatic lookup
+supports `dim_wasm.wasm.base64` beside the wrapper and at
+`public/dim/dim_wasm.wasm.base64`. This text-safe form is used by the shadcn
+registry because registry file payloads are serialized as UTF-8 text. Release
+archives continue to ship the normal binary `dim_wasm.wasm`.
+
+## React components and shadcn registry
+
+This repository is also a public [shadcn GitHub registry](https://ui.shadcn.com/docs/registry/github).
+It exposes three items:
+
+- `dim` installs `@lib/dim/dim.ts` plus the text-safe WASM asset in
+  `public/dim/`.
+- `dim-provider` installs the runtime item and a client-side `DimProvider` /
+  `useDim` context.
+- `quantity-input` installs both items above plus the shadcn Input Group and
+  Popover dependencies.
+
+From a project that already has a `components.json` file, install the complete
+quantity input with:
+
+```bash
+npx shadcn@latest add Jerell/dim/quantity-input
+```
+
+Or install only the runtime/provider:
+
+```bash
+npx shadcn@latest add Jerell/dim/dim
+npx shadcn@latest add Jerell/dim/dim-provider
+```
+
+Wrap the relevant client tree once:
+
+```tsx
+import { DimProvider } from "@/components/dim-provider";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <DimProvider>{children}</DimProvider>;
+}
+```
+
+Then use the square-edged input in a form or table cell. Plain numbers are
+interpreted in the declared `unit`; full dim expressions are also accepted.
+
+```tsx
+import { QuantityInput } from "@/components/quantity-input";
+
+<QuantityInput
+  unit="bar"
+  defaultValue="250 kPa"
+  conversions={[
+    { unit: "bar", label: "bara", decimalPlaces: 3 },
+    { unit: "kPa", decimalPlaces: 1 },
+    { unit: "psi", decimalPlaces: 2 },
+  ]}
+  onValueChange={(value) => console.log(value)}
+/>;
+```
+
+`QuantityInput` has no rounded edges or shadow by default. Use
+`groupClassName` to merge its border into table cells, and change the copied
+component after installation if an application needs different presentation
+or validation behavior.
+
+Registry development commands:
+
+```bash
+just react-install
+just storybook              # hot-reloading component workbench
+just test-components
+just test-components-watch
+just registry-build
+just registry-validate
+just registry-view quantity-input
+just check-react
+```
+
+`registry:build` recompiles WASM, regenerates the armored registry asset, and
+writes static registry JSON to `public/r`. The root `registry.json` also makes
+the repository directly installable without hosting those generated files.
+Run `just add-ui <name>...` when a future component needs additional shadcn
+primitives.
+
 ### Testing and Fuzzing
 
 Run the complete test suite with:
@@ -207,8 +291,9 @@ zig build test
 ```
 
 The suite includes library, CLI, fuzz smoke, external-consumer, and WASM ABI
-contract coverage. CI additionally compiles a C header consumer and exercises
-the shipped TypeScript wrapper against the generated module.
+contract coverage. CI additionally compiles a C header consumer, exercises the
+shipped TypeScript wrapper against binary and base64 WASM, runs the React
+component tests, validates the registry build, and builds Storybook.
 
 The test suite also includes a built-in Zig fuzz target for arbitrary
 expressions, REPL sessions, and unit expressions. Run a bounded fuzz pass with:

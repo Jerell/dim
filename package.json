@@ -1,0 +1,51 @@
+{
+  "name": "dim-registry",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "zig build wasm -Doptimize=ReleaseSmall",
+    "sync:wasm": "node scripts/registry/sync-wasm.mjs",
+    "registry:build": "npm run build:wasm && npm run sync:wasm && shadcn build",
+    "registry:validate": "shadcn registry validate ./registry.json",
+    "prestorybook": "npm run build:wasm && npm run sync:wasm",
+    "storybook": "storybook dev -p 6006",
+    "prestorybook:build": "npm run build:wasm && npm run sync:wasm",
+    "storybook:build": "storybook build",
+    "pretest:components": "npm run build:wasm && npm run sync:wasm",
+    "test:components": "vitest run",
+    "test": "npm run test:components",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.7.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.31.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.5.7",
+    "@storybook/react-vite": "^10.5.7",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "jsdom": "^30.0.1",
+    "shadcn": "^4.16.2",
+    "storybook": "^10.5.7",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  }
+}

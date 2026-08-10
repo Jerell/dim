@@ -1,0 +1,58 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "dim",
+  "homepage": "https://github.com/Jerell/dim",
+  "items": [
+    {
+      "name": "dim",
+      "type": "registry:lib",
+      "title": "dim WebAssembly runtime",
+      "description": "The dim TypeScript runtime and a text-safe copy of the compiled WebAssembly module.",
+      "files": [
+        {
+          "path": "wasm/dim.ts",
+          "type": "registry:lib",
+          "target": "@lib/dim/dim.ts"
+        },
+        {
+          "path": "registry/assets/dim_wasm.wasm.base64",
+          "type": "registry:file",
+          "target": "~/public/dim/dim_wasm.wasm.base64"
+        }
+      ]
+    },
+    {
+      "name": "dim-provider",
+      "type": "registry:component",
+      "title": "dim provider",
+      "description": "A React context provider for initializing dim and sharing its readiness state.",
+      "registryDependencies": ["Jerell/dim/dim"],
+      "files": [
+        {
+          "path": "registry/components/dim-provider.tsx",
+          "type": "registry:component",
+          "target": "@components/dim-provider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "quantity-input",
+      "type": "registry:component",
+      "title": "Quantity input",
+      "description": "A square-edged quantity expression input with a conversion popover, designed for forms and spreadsheet-like tables.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "input-group",
+        "popover",
+        "Jerell/dim/dim-provider"
+      ],
+      "files": [
+        {
+          "path": "registry/components/quantity-input.tsx",
+          "type": "registry:component",
+          "target": "@components/quantity-input.tsx"
+        }
+      ]
+    }
+  ]
+}

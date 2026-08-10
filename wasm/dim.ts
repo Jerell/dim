@@ -109,6 +109,8 @@ export type DimEvalResult =
 
 export type DimInitOptions = {
   wasmBytes?: ArrayBuffer | ArrayBufferView;
+  /** Base64-encoded WASM, useful for text-only distribution channels. */
+  wasmBase64?: string;
   wasmUrl?: string | URL;
   fetchOptions?: RequestInit;
 };
@@ -270,6 +272,24 @@ function toArrayBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffer {
   ) as ArrayBuffer;
 }
 
+function decodeWasmBase64(value: string): ArrayBuffer {
+  const normalized = value.replace(/\s+/g, "");
+  const binary = globalThis.atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function isBase64WasmSource(source: string | URL): boolean {
+  const pathname =
+    source instanceof URL
+      ? source.pathname
+      : source.replace(/[?#].*$/, "");
+  return pathname.endsWith(".wasm.base64");
+}
+
 async function responseToArrayBuffer(
   response: Response,
   source: string,
@@ -278,6 +298,10 @@ async function responseToArrayBuffer(
     throw new Error(
       `Failed to load dim_wasm.wasm from ${source}: ${response.status} ${response.statusText}`,
     );
+  }
+
+  if (isBase64WasmSource(source)) {
+    return decodeWasmBase64(await response.text());
   }
 
   return response.arrayBuffer();
@@ -301,6 +325,10 @@ async function findWasmBytes(
     return toArrayBuffer(options.wasmBytes);
   }
 
+  if (options.wasmBase64) {
+    return decodeWasmBase64(options.wasmBase64);
+  }
+
   if (options.wasmUrl) {
     return fetchWasmUrl(options.wasmUrl, options.fetchOptions);
   }
@@ -321,24 +349,56 @@ async function findWasmBytes(
     const thisDir = dirname(__filename);
 
     const candidates = [
-      fileURLToPath(moduleUrl),
-      join(thisDir, "dim_wasm.wasm"),
-      join(thisDir, "..", "..", "..", "public", "dim", "dim_wasm.wasm"),
-      join(process.cwd(), "dim", "wasm", "dim_wasm.wasm"),
-      join(process.cwd(), "public", "dim", "dim_wasm.wasm"),
-    ].filter((candidate, index, list) => list.indexOf(candidate) === index);
+      { path: fileURLToPath(moduleUrl), base64: false },
+      { path: join(thisDir, "dim_wasm.wasm"), base64: false },
+      {
+        path: join(thisDir, "..", "..", "..", "public", "dim", "dim_wasm.wasm"),
+        base64: false,
+      },
+      { path: join(process.cwd(), "dim", "wasm", "dim_wasm.wasm"), base64: false },
+      { path: join(process.cwd(), "public", "dim", "dim_wasm.wasm"), base64: false },
+      { path: join(thisDir, "dim_wasm.wasm.base64"), base64: true },
+      {
+        path: join(
+          thisDir,
+          "..",
+          "..",
+          "..",
+          "public",
+          "dim",
+          "dim_wasm.wasm.base64",
+        ),
+        base64: true,
+      },
+      {
+        path: join(process.cwd(), "public", "dim", "dim_wasm.wasm.base64"),
+        base64: true,
+      },
+    ].filter(
+      (candidate, index, list) =>
+        list.findIndex((item) => item.path === candidate.path) === index,
+    );
 
-    const wasmPath = candidates.find((p) => existsSync(p));
-    if (!wasmPath) {
+    const candidate = candidates.find(({ path }) => existsSync(path));
+    if (!candidate) {
       throw new Error(
-        `Could not find dim_wasm.wasm. Searched:\n${candidates.join("\n")}`,
+        `Could not find dim WASM. Searched:\n${candidates.map(({ path }) => path).join("\n")}`,
       );
     }
 
-    const buf = await readFile(wasmPath);
+    if (candidate.base64) {
+      return decodeWasmBase64(await readFile(candidate.path, "utf8"));
+    }
+
+    const buf = await readFile(candidate.path);
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   } else {
-    const sources: Array<string | URL> = [moduleUrl, "/dim/dim_wasm.wasm"];
+    const sources: Array<string | URL> = [
+      moduleUrl,
+      "/dim/dim_wasm.wasm",
+      new URL("./dim_wasm.wasm.base64", import.meta.url),
+      "/dim/dim_wasm.wasm.base64",
+    ];
     const failures: string[] = [];
 
     for (const source of sources) {

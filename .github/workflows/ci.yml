@@ -42,6 +42,27 @@ jobs:
       - name: Test TypeScript WASM wrapper
         run: node --experimental-strip-types tests/wasm_wrapper.test.mjs
 
+      - name: Install registry development dependencies
+        run: npm ci
+
+      - name: Type-check React registry source
+        run: npm run typecheck
+
+      - name: Run React component tests
+        run: npm run test:components
+
+      - name: Build shadcn registry
+        run: npm run registry:build
+
+      - name: Validate shadcn registry
+        run: npm run registry:validate
+
+      - name: Check committed WASM registry asset
+        run: git diff --exit-code -- registry/assets/dim_wasm.wasm.base64
+
+      - name: Build Storybook
+        run: npm run storybook:build
+
   build-native:
     strategy:
       fail-fast: false

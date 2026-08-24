@@ -21,19 +21,18 @@ test "README formatting and evaluation surface compiles" {
     const distance = Length.from(100.0, Si.km);
     const elapsed = Time.from(1.0, Si.h);
     const speed = try distance.div(elapsed);
-    const kmh = Si.km.div(Si.h, "km/h");
-    const safe_kmh = try Si.km.divChecked(Si.h, "km/h");
+    const kmh = try Si.km.div(Si.h, "km/h");
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
     try speed.with(dim.Registries.si, .scientific).format(&output.writer);
-    try speed.asUnit(safe_kmh, .none).format(&output.writer);
+    try speed.asUnit(kmh, .none).format(&output.writer);
 
     var result = try dim.evaluate(std.testing.allocator, "100 km/h as m/s", null);
     defer dim.deinitLiteralValue(std.testing.allocator, &result);
 
     try std.testing.expectApproxEqAbs(100.0, speed.asUnit(kmh, .none).q.value / kmh.scale, 1e-9);
-    try std.testing.expectApproxEqAbs(100.0, speed.asUnit(safe_kmh, .none).q.value / safe_kmh.scale, 1e-9);
+    try std.testing.expectApproxEqAbs(100.0, speed.asUnit(kmh, .none).q.value / kmh.scale, 1e-9);
 }
 
 test "temperature delta checks are runtime-safe and scalar operations preserve state" {

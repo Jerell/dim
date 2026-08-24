@@ -98,10 +98,10 @@ Status is one of `not started`, `drafted`, or `verified`.
 | Document | Status |
 | --- | --- |
 | glossary.md | drafted |
-| foundations/type-and-dimension-model.md | not started |
-| foundations/unit-and-registry-model.md | not started |
-| foundations/ownership-and-errors.md | not started |
-| library/quantity-arithmetic.md | not started |
+| foundations/type-and-dimension-model.md | drafted |
+| foundations/unit-and-registry-model.md | drafted |
+| foundations/ownership-and-errors.md | drafted |
+| library/quantity-arithmetic.md | drafted |
 | library/unit-construction.md | not started |
 | library/runtime-evaluation.md | not started |
 | library/contexts-and-constants.md | not started |

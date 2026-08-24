@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import { DimProvider, useDim } from "@/components/dim-provider";
@@ -25,11 +25,13 @@ describe("DimProvider", () => {
     );
 
     expect(await screen.findByText("ready")).toBeVisible();
-    const result = evalStructured("2 workday as h");
-    expect(result.kind).toBe("quantity");
-    if (result.kind === "quantity") {
-      expect(result.value).toBe(16);
-      expect(result.unit).toBe("h");
-    }
+    await waitFor(() => {
+      const result = evalStructured("2 workday as h");
+      expect(result.kind).toBe("quantity");
+      if (result.kind === "quantity") {
+        expect(result.value).toBe(16);
+        expect(result.unit).toBe("h");
+      }
+    });
   });
 });

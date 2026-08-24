@@ -31,6 +31,11 @@ fn flushAll(out: *std.Io.Writer, err: *std.Io.Writer) !void {
     try err.flush();
 }
 
+fn exitFailure(out: *std.Io.Writer, err: *std.Io.Writer) noreturn {
+    flushAll(out, err) catch {};
+    std.process.exit(1);
+}
+
 pub fn main(init: std.process.Init) !void {
     const default_io = init.io;
     const allocator = init.arena.allocator();
@@ -52,11 +57,11 @@ pub fn main(init: std.process.Init) !void {
 
     if (args.len == 1) {
         // No args: if stdin is a TTY, start REPL; otherwise, read from stdin once
-        if (try std.Io.File.stdin().isTty(default_io)) {
-            try runPrompt(allocator, in, out, err);
-        } else {
+        const ok = if (try std.Io.File.stdin().isTty(default_io))
+            try runPrompt(allocator, in, out, err)
+        else
             try runStdin(allocator, in, out, err);
-        }
+        if (!ok) exitFailure(out, err);
         return;
     }
 
@@ -74,7 +79,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (std.mem.eql(u8, arg1, "-")) {
-        try runStdin(allocator, in, out, err);
+        if (!try runStdin(allocator, in, out, err)) exitFailure(out, err);
         return;
     }
 
@@ -86,13 +91,13 @@ pub fn main(init: std.process.Init) !void {
             );
             std.process.exit(64);
         }
-        try runFile(allocator, default_io, out, err, args[2]);
+        if (!try runFile(allocator, default_io, out, err, args[2])) exitFailure(out, err);
         return;
     }
 
     if (args.len == 2) {
         // Treat the sole arg as an expression to evaluate
-        try run(allocator, out, err, arg1);
+        if (!try run(allocator, out, err, arg1)) exitFailure(out, err);
         return;
     }
 
@@ -101,16 +106,18 @@ pub fn main(init: std.process.Init) !void {
     std.process.exit(64);
 }
 
-fn runStdin(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Writer, err: *std.Io.Writer) !void {
+fn runStdin(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Writer, err: *std.Io.Writer) !bool {
     const bytes = try in.allocRemaining(allocator, .unlimited);
     defer allocator.free(bytes);
 
+    var ok = true;
     var it = std.mem.tokenizeAny(u8, bytes, "\r\n");
     while (it.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0) continue;
-        try run(allocator, out, err, trimmed);
+        if (!try run(allocator, out, err, trimmed)) ok = false;
     }
+    return ok;
 }
 
 fn evalTestExpr(allocator: std.mem.Allocator, line: []const u8) (TestError || dim.RuntimeError || error{OutOfMemory})!dim.LiteralValue {
@@ -365,36 +372,39 @@ test "unit grouping parentheses in quantity literal (1 J/(kg·K))" {
     }
 }
 
-fn runFile(allocator: std.mem.Allocator, io: std.Io, out: *std.Io.Writer, err: *std.Io.Writer, path: []const u8) !void {
+fn runFile(allocator: std.mem.Allocator, io: std.Io, out: *std.Io.Writer, err: *std.Io.Writer, path: []const u8) !bool {
     const bytes = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .unlimited);
     defer allocator.free(bytes);
 
+    var ok = true;
     var it = std.mem.tokenizeAny(u8, bytes, "\r\n");
     while (it.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0) continue;
-        try run(allocator, out, err, trimmed);
+        if (!try run(allocator, out, err, trimmed)) ok = false;
     }
+    return ok;
 }
 
-fn runPrompt(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Writer, err: *std.Io.Writer) !void {
+fn runPrompt(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Writer, err: *std.Io.Writer) !bool {
+    var ok = true;
     while (true) {
         try out.writeAll("> ");
         try flushAll(out, err);
         const line = readLineAlloc(in, allocator, 4096) catch |read_err| {
-            if (read_err == error.EndOfStream) return; // exit on EOF
+            if (read_err == error.EndOfStream) return ok; // exit on EOF
             return read_err;
         };
         defer allocator.free(line);
 
-        try run(allocator, out, err, line);
+        if (!try run(allocator, out, err, line)) ok = false;
         try flushAll(out, err);
     }
 }
 
-fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, source: []const u8) !void {
+fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, source: []const u8) !bool {
     const trimmed = std.mem.trim(u8, source, " \t\r\n");
-    if (trimmed.len == 0) return;
+    if (trimmed.len == 0) return true;
     const err_writer: ?*std.Io.Writer = err;
 
     // Commands will be handled after scanning using tokens
@@ -402,7 +412,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     // 1. Scan
     var scanner = try Scanner.init(allocator, err_writer, trimmed);
     const tokens = try scanner.scanTokens();
-    if (scanner.hadError) return;
+    if (scanner.hadError) return false;
 
     // Handle commands using tokens (post-tokenization). A command must consume
     // the whole line; otherwise a typo such as `show d extra` must not perform
@@ -410,7 +420,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     if (tokens.len >= 1 and tokens[0].type == .List) {
         if (tokens.len != 2 or tokens[1].type != .Eof) {
             try err.writeAll("Invalid list command. Use `list`.\n");
-            return;
+            return false;
         }
         const count = dim.constantsCount();
         var i: usize = 0;
@@ -422,12 +432,12 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
                 try out.print("{s}: dim {any}, 1 {s} = {d:.6} {s}\n", .{ entry.name, entry.unit.dim, entry.name, entry.unit.scale, unit_str });
             }
         }
-        return;
+        return true;
     }
     if (tokens.len >= 1 and tokens[0].type == .Show) {
         if (tokens.len != 3 or tokens[1].type != .Identifier or tokens[2].type != .Eof) {
             try err.writeAll("Invalid show command. Use `show <name>`.\n");
-            return;
+            return false;
         }
         const name = tokens[1].lexeme;
         if (dim.getConstant(name)) |u| {
@@ -436,19 +446,20 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
             try out.print("{s}: dim {any}, 1 {s} = {d:.6} {s}\n", .{ name, u.dim, name, u.scale, unit_str });
         } else {
             try err.print("Unknown constant '{s}'\n", .{name});
+            return false;
         }
-        return;
+        return true;
     }
     if (tokens.len >= 1 and tokens[0].type == .Clear) {
         const valid_all = tokens.len == 3 and tokens[1].type == .All and tokens[2].type == .Eof;
         const valid_name = tokens.len == 3 and tokens[1].type == .Identifier and tokens[2].type == .Eof;
         if (!valid_all and !valid_name) {
             try err.writeAll("Invalid clear command. Use `clear <name>` or `clear all`.\n");
-            return;
+            return false;
         }
         if (valid_all) dim.clearAllConstants() else dim.clearConstant(tokens[1].lexeme);
         try out.writeAll("ok\n");
-        return;
+        return true;
     }
 
     // No special-case parsing for constant declarations; handled by parser as assignment
@@ -458,7 +469,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     const maybe_expr = parser.parse();
 
     if (parser.hadError or maybe_expr == null) {
-        return; // errors already reported
+        return false; // errors already reported
     }
 
     const expr = maybe_expr.?;
@@ -466,7 +477,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     // 3. Evaluate
     const result = expr.evaluate(allocator) catch |eval_err| {
         try err_writer.?.print("Runtime error: {any}\n", .{eval_err});
-        return;
+        return false;
     };
 
     // 4/5. If there is a trailing expression after the first parse (common with assignment + expr),
@@ -477,7 +488,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
         has_trailing = !(remaining.len == 1 and remaining[0].type == .Eof);
         if (has_trailing and expr.* != .assignment) {
             dim.reportTokenError(allocator, tokens[parser.current], "Unexpected token", err_writer);
-            return;
+            return false;
         }
         if (has_trailing) {
             var trail_parser = Parser.init(allocator, remaining, err_writer);
@@ -485,7 +496,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
             if (maybe_expr2) |expr2| {
                 const res2 = expr2.evaluate(allocator) catch |eval_err| {
                     try err_writer.?.print("Runtime error: {any}\n", .{eval_err});
-                    return;
+                    return false;
                 };
                 switch (res2) {
                     .number => |n| try out.print("{d}\n", .{n}),
@@ -498,7 +509,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
                     .nil => try out.writeAll("nil\n"),
                 }
                 try flushAll(out, err);
-                return;
+                return true;
             }
         }
     }
@@ -516,6 +527,21 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
         }
         try flushAll(out, err);
     }
+    return true;
+}
+
+test "CLI line failures are reported to the caller" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var out: std.Io.Writer.Allocating = .init(allocator);
+    defer out.deinit();
+    var err: std.Io.Writer.Allocating = .init(allocator);
+    defer err.deinit();
+
+    try std.testing.expect(!(try run(allocator, &out.writer, &err.writer, "1 m / 0 m")));
+    try std.testing.expect(std.mem.containsAtLeast(u8, err.written(), 1, "Runtime error:"));
 }
 
 test "constant commands reject trailing tokens" {
@@ -527,13 +553,13 @@ test "constant commands reject trailing tokens" {
     defer define_out.deinit();
     var define_err: std.Io.Writer.Allocating = .init(allocator);
     defer define_err.deinit();
-    try run(allocator, &define_out.writer, &define_err.writer, "cli_test_d = (24 h)");
+    _ = try run(allocator, &define_out.writer, &define_err.writer, "cli_test_d = (24 h)");
 
     var command_out: std.Io.Writer.Allocating = .init(allocator);
     defer command_out.deinit();
     var command_err: std.Io.Writer.Allocating = .init(allocator);
     defer command_err.deinit();
-    try run(allocator, &command_out.writer, &command_err.writer, "show cli_test_d extra");
+    _ = try run(allocator, &command_out.writer, &command_err.writer, "show cli_test_d extra");
 
     try std.testing.expectEqual(@as(usize, 0), command_out.written().len);
     try std.testing.expectEqualStrings("Invalid show command. Use `show <name>`.\n", command_err.written());

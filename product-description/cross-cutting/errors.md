@@ -6,7 +6,7 @@ The CLI has three user-visible expression failure stages: scanning, parsing, and
 
 ## The simple case
 
-A malformed expression such as `1e` prints a parse diagnostic and no result. `1 m / 0 m` reaches evaluation and prints a runtime diagnostic. A bad `--file` arity prints an argument error and usage, then exits 64.
+A malformed expression such as `1e` prints a scanner or parser diagnostic and no result. `1 m / 0 m` reaches evaluation and prints a runtime diagnostic. A bad `--file` arity prints an argument error and usage, then exits 64.
 
 ## The interaction, event by event
 

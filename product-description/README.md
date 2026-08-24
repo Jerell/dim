@@ -83,17 +83,17 @@ cross-cutting/
 | Document | Status |
 | --- | --- |
 | glossary.md | drafted |
-| foundations/invocation.md | not started |
-| foundations/configuration.md | not started |
-| foundations/output.md | not started |
-| foundations/session-state.md | not started |
-| cli/constants.md | not started |
-| cli/expressions.md | not started |
-| cli/conversions.md | not started |
-| cli/input-sources.md | not started |
-| cross-cutting/errors.md | not started |
-| verification/ (1 checklist) | not started |
-| bug-triage.md | not started |
+| foundations/invocation.md | drafted |
+| foundations/configuration.md | drafted |
+| foundations/output.md | drafted |
+| foundations/session-state.md | drafted |
+| cli/constants.md | drafted |
+| cli/expressions.md | drafted |
+| cli/conversions.md | drafted |
+| cli/input-sources.md | drafted |
+| cross-cutting/errors.md | drafted |
+| verification/ (1 checklist) | drafted |
+| bug-triage.md | drafted |
 
 ## Reference
 

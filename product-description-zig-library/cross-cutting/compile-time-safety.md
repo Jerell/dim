@@ -86,7 +86,7 @@ The consumer either receives a value, an error union, null, or no executable at 
 
 - `fromDynamic` is the intended runtime counterpart to comptime `from`.
 - `div` can return an error even when its operand types are valid because delta state is runtime.
-- `evaluate` returning null does not identify whether parsing, evaluation, or allocation failed.
+- `evaluate` returns typed parse, runtime, and allocation errors; callers can still choose a lower-information wrapper if they intentionally discard them.
 - Unchecked APIs are safe only when the caller has established their preconditions.
 
 ## Open questions and verification

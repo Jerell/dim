@@ -52,7 +52,7 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Display quantity.** An allocator-owned runtime value containing a numeric value, dimension, unit string, format mode, delta marker, and value-space marker.
 
-**Expression evaluation.** Parsing and calculating a string expression through `evaluate` or `evaluateWithContext`, returning an optional `LiteralValue`.
+**Expression evaluation.** Parsing and calculating a string expression through `evaluate` or `evaluateWithContext`, returning `EvaluationError!LiteralValue`.
 
 ## Formatting and resources
 

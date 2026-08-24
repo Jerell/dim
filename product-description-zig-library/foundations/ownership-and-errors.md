@@ -6,7 +6,7 @@ The library combines value types with allocator-owned runtime strings and contex
 
 ## The simple case
 
-Call `dim.evaluate(allocator, "100 km/h as m/s", null)`. On success, the consumer receives a `LiteralValue`; if it contains a display quantity, the consumer formats it and calls `dim.deinitLiteralValue` before discarding it. An explicit `DimContext` must also be deinitialized when its owner is finished.
+Call `try dim.evaluate(allocator, "100 km/h as m/s", null)`. On success, the consumer receives a `LiteralValue`; if it contains a display quantity, the consumer formats it and calls `dim.deinitLiteralValue` before discarding it. Parse, runtime, and allocation failures are returned as typed errors. An explicit `DimContext` must also be deinitialized when its owner is finished.
 
 ## The interaction, event by event
 

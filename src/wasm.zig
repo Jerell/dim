@@ -118,7 +118,7 @@ fn ensureContext(ctx: ?*dim.DimContext) ?*dim.DimContext {
 }
 
 fn evaluateOwned(ctx: *dim.DimContext, input: []const u8) !dim.LiteralValue {
-    return dim.evaluateWithContext(ctx, ffiAllocator(), input, null) orelse error.EvalError;
+    return dim.evaluateWithContext(ctx, ffiAllocator(), input, null) catch error.EvalError;
 }
 
 fn literalDimension(value: dim.LiteralValue) ?dim.Dimension {

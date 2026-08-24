@@ -39,13 +39,13 @@ Run `zig build test` from the source checkout. Use temporary consumer fixtures f
 | ID | P | Device | Claim | Setup | Steps | Expected | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | EVAL-01 | P1 | consumer fixture | String evaluation returns a converted display quantity ([return](../library/runtime-evaluation.md#return)). | Allocator and expression. | 1. Evaluate `100 km/h as m/s`.<br>2. Format and deinitialize. | Result is approximately 27.7778 m/s and cleanup succeeds. | — |
-| EVAL-02 | P1 | consumer fixture | Invalid expression returns null ([compile or return immediately](../library/runtime-evaluation.md#compile-or-return-immediately)). | Error writer optional. | 1. Evaluate malformed source.<br>2. Inspect optional result. | No result is returned. | — |
+| EVAL-02 | P1 | consumer fixture | Invalid expression returns `error.ParseError` ([compile or return immediately](../library/runtime-evaluation.md#compile-or-return-immediately)). | Error writer optional. | 1. Evaluate malformed source.<br>2. Inspect error. | The typed parse error is returned. | — |
 
 ## library/contexts-and-constants.md
 
 | ID | P | Device | Claim | Setup | Steps | Expected | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| CTX-01 | P1 | consumer fixture | Explicit contexts isolate constants ([the simple case](../library/contexts-and-constants.md#the-simple-case)). | Two contexts. | 1. Define `foo` in context A.<br>2. Resolve in A and B. | A resolves it; B does not. | — |
+| CTX-01 | P1 | consumer fixture | Explicit contexts isolate constants ([the simple case](../library/contexts-and-constants.md#the-simple-case)). | Two contexts. | 1. Define `foo` in context A.<br>2. Resolve in A and B. | A resolves it; B returns `error.UndefinedVariable`. | — |
 
 ## library/display-quantities.md
 

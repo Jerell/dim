@@ -98,10 +98,10 @@ Status is one of `not started`, `drafted`, or `verified`.
 | Document | Status |
 | --- | --- |
 | glossary.md | drafted |
-| foundations/runtime-lifecycle.md | not started |
-| foundations/result-and-memory.md | not started |
-| foundations/input-normalization.md | not started |
-| api/initialization-and-evaluation.md | not started |
+| foundations/runtime-lifecycle.md | drafted |
+| foundations/result-and-memory.md | drafted |
+| foundations/input-normalization.md | drafted |
+| api/initialization-and-evaluation.md | drafted |
 | api/conversions.md | not started |
 | api/batch-operations.md | not started |
 | api/constants-and-contexts.md | not started |

@@ -102,12 +102,12 @@ Status is one of `not started`, `drafted`, or `verified`.
 | foundations/result-and-memory.md | drafted |
 | foundations/input-normalization.md | drafted |
 | api/initialization-and-evaluation.md | drafted |
-| api/conversions.md | not started |
-| api/batch-operations.md | not started |
-| api/constants-and-contexts.md | not started |
-| api/recovery.md | not started |
-| api/formatting.md | not started |
-| cross-cutting/browser-loading.md | not started |
+| api/conversions.md | drafted |
+| api/batch-operations.md | drafted |
+| api/constants-and-contexts.md | drafted |
+| api/recovery.md | drafted |
+| api/formatting.md | drafted |
+| cross-cutting/browser-loading.md | drafted |
 | verification/ (1 checklist) | not started |
 | bug-triage.md | not started |
 

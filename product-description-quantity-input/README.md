@@ -98,10 +98,10 @@ Status is one of `not started`, `drafted`, or `verified`.
 | Document | Status |
 | --- | --- |
 | glossary.md | drafted |
-| foundations/field-state.md | not started |
-| foundations/value-ownership.md | not started |
-| foundations/runtime-readiness.md | not started |
-| quantity-input/basic-editing.md | not started |
+| foundations/field-state.md | drafted |
+| foundations/value-ownership.md | drafted |
+| foundations/runtime-readiness.md | drafted |
+| quantity-input/basic-editing.md | drafted |
 | quantity-input/validation-and-conversions.md | not started |
 | quantity-input/conversion-popover.md | not started |
 | quantity-input/spreadsheet-integration.md | not started |

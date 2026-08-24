@@ -29,7 +29,7 @@ test "README formatting and evaluation surface compiles" {
     try speed.with(dim.Registries.si, .scientific).format(&output.writer);
     try speed.asUnit(safe_kmh, .none).format(&output.writer);
 
-    var result = dim.evaluate(std.testing.allocator, "100 km/h as m/s", null) orelse return error.TestUnexpectedResult;
+    var result = try dim.evaluate(std.testing.allocator, "100 km/h as m/s", null);
     defer dim.deinitLiteralValue(std.testing.allocator, &result);
 
     try std.testing.expectApproxEqAbs(100.0, speed.asUnit(kmh, .none).q.value / kmh.scale, 1e-9);
@@ -95,10 +95,13 @@ test "explicit contexts isolate constants without an active global context" {
     var second = dim.DimContext.init(std.testing.allocator);
     defer second.deinit();
 
-    var defined = dim.evaluateWithContext(&first, std.testing.allocator, "x = (2 m)", null) orelse return error.TestUnexpectedResult;
+    var defined = try dim.evaluateWithContext(&first, std.testing.allocator, "x = (2 m)", null);
     defer dim.deinitLiteralValue(std.testing.allocator, &defined);
 
-    var resolved = dim.evaluateWithContext(&first, std.testing.allocator, "1 x as m", null) orelse return error.TestUnexpectedResult;
+    var resolved = try dim.evaluateWithContext(&first, std.testing.allocator, "1 x as m", null);
     defer dim.deinitLiteralValue(std.testing.allocator, &resolved);
-    try std.testing.expect(dim.evaluateWithContext(&second, std.testing.allocator, "1 x as m", null) == null);
+    try std.testing.expectError(
+        error.UndefinedVariable,
+        dim.evaluateWithContext(&second, std.testing.allocator, "1 x as m", null),
+    );
 }

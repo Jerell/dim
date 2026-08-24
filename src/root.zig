@@ -35,6 +35,8 @@ pub const reportTokenError = @import("parser/parser.zig").reportTokenError;
 pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
 pub const Expr = @import("parser/expressions.zig").Expr;
 pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;
+pub const ParseError = @import("parser/parser.zig").ParseError;
+pub const EvaluationError = error{ParseError} || RuntimeError;
 pub const ConstantEntry = struct {
     name: []const u8,
     unit: Unit,
@@ -152,44 +154,43 @@ pub fn evaluateWithContext(
     result_allocator: std.mem.Allocator,
     source: []const u8,
     err_writer: ?*std.Io.Writer,
-) ?LiteralValue {
+) EvaluationError!LiteralValue {
     const arena_alloc = ctx.scratchAllocator();
 
-    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return null;
-    const tokens = scanner.scanTokens() catch return null;
-    if (scanner.hadError) return null;
+    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return error.OutOfMemory;
+    const tokens = scanner.scanTokens() catch return error.OutOfMemory;
+    if (scanner.hadError) return error.ParseError;
     var parser = Parser.init(arena_alloc, tokens, err_writer);
-    const expr = parser.parse() orelse return null;
-    if (parser.hadError) return null;
+    const expr = parser.parseDetailed() catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return error.ParseError,
+    };
+    if (parser.hadError) return error.ParseError;
     if (tokens[parser.current].type != .Eof) {
         reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
-        return null;
+        return error.ParseError;
     }
-    const result = expr.evaluateInContext(arena_alloc, ctx) catch return null;
+    const result = expr.evaluateInContext(arena_alloc, ctx) catch |err| return err;
 
     return switch (result) {
         .display_quantity => |dq| LiteralValue{ .display_quantity = .{
             .value = dq.value,
             .dim = dq.dim,
-            .unit = result_allocator.dupe(u8, dq.unit) catch return null,
+            .unit = result_allocator.dupe(u8, dq.unit) catch return error.OutOfMemory,
             .owns_unit = true,
             .mode = dq.mode,
             .is_delta = dq.is_delta,
             .value_space = dq.value_space,
         } },
-        .string => |s| LiteralValue{ .string = result_allocator.dupe(u8, s) catch return null },
+        .string => |s| LiteralValue{ .string = result_allocator.dupe(u8, s) catch return error.OutOfMemory },
         else => result,
     };
 }
 
-/// Evaluate a string expression. Returns null on parse/eval errors.
-/// This convenience form uses the calling thread's default context. Embedders
-/// that need isolation or concurrency should use `evaluateWithContext`.
-/// Pass an error writer to receive error messages, or null to discard them.
-/// The returned LiteralValue (if .display_quantity) has its .unit string
-/// allocated with the provided allocator. All intermediate scanner/parser
-/// allocations are cleaned up automatically via an internal arena.
-pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) ?LiteralValue {
+/// Evaluate a string expression with typed parse, runtime, and allocation errors.
+/// This form uses the calling thread's default context. Embedders that need
+/// isolation or concurrency should use `evaluateWithContext`.
+pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) EvaluationError!LiteralValue {
     return evaluateWithContext(currentContext(), allocator, source, err_writer);
 }
 
@@ -464,26 +465,39 @@ test "pressure quantity arithmetic mirrors absolute and delta rules" {
     try std.testing.expectApproxEqAbs(-0.01325, _si.bar.fromCanonicalValue(reverse_mixed_diff.value, reverse_mixed_diff.is_delta), 1e-9);
 }
 
+test "evaluation preserves parse and runtime error categories" {
+    try std.testing.expectError(
+        error.ParseError,
+        evaluate(std.testing.allocator, "1 m trailing", null),
+    );
+    try std.testing.expectError(
+        error.DivisionByZero,
+        evaluate(std.testing.allocator, "1 / 0", null),
+    );
+}
+
 test "context-scoped constants do not leak across contexts" {
     var ctx_a = DimContext.init(std.testing.allocator);
     defer ctx_a.deinit();
     var ctx_b = DimContext.init(std.testing.allocator);
     defer ctx_b.deinit();
 
-    var define_a = evaluateWithContext(&ctx_a, std.testing.allocator, "foo = (2 m)", null) orelse return error.TestUnexpectedResult;
+    var define_a = try evaluateWithContext(&ctx_a, std.testing.allocator, "foo = (2 m)", null);
     defer deinitLiteralValue(std.testing.allocator, &define_a);
 
     try std.testing.expect(ctx_a.getConstant("foo") != null);
     try std.testing.expect(ctx_b.getConstant("foo") == null);
 
-    var res_a = evaluateWithContext(&ctx_a, std.testing.allocator, "1 foo as m", null) orelse return error.TestUnexpectedResult;
+    var res_a = try evaluateWithContext(&ctx_a, std.testing.allocator, "1 foo as m", null);
     defer deinitLiteralValue(std.testing.allocator, &res_a);
 
     try std.testing.expectEqual(@as(usize, 1), ctx_a.constantsCount());
     try std.testing.expectEqual(@as(usize, 0), ctx_b.constantsCount());
 
-    const missing_b = evaluateWithContext(&ctx_b, std.testing.allocator, "1 foo as m", null);
-    try std.testing.expect(missing_b == null);
+    try std.testing.expectError(
+        error.UndefinedVariable,
+        evaluateWithContext(&ctx_b, std.testing.allocator, "1 foo as m", null),
+    );
 
     switch (res_a) {
         .display_quantity => |dq| try std.testing.expectApproxEqAbs(2.0, dq.value, 1e-9),

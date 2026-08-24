@@ -102,12 +102,12 @@ Status is one of `not started`, `drafted`, or `verified`.
 | foundations/unit-and-registry-model.md | drafted |
 | foundations/ownership-and-errors.md | drafted |
 | library/quantity-arithmetic.md | drafted |
-| library/unit-construction.md | not started |
-| library/runtime-evaluation.md | not started |
-| library/contexts-and-constants.md | not started |
-| library/display-quantities.md | not started |
-| library/formatting.md | not started |
-| cross-cutting/compile-time-safety.md | not started |
+| library/unit-construction.md | drafted |
+| library/runtime-evaluation.md | drafted |
+| library/contexts-and-constants.md | drafted |
+| library/display-quantities.md | drafted |
+| library/formatting.md | drafted |
+| cross-cutting/compile-time-safety.md | drafted |
 | verification/ (1 checklist) | not started |
 | bug-triage.md | not started |
 

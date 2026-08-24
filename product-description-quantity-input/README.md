@@ -102,10 +102,10 @@ Status is one of `not started`, `drafted`, or `verified`.
 | foundations/value-ownership.md | drafted |
 | foundations/runtime-readiness.md | drafted |
 | quantity-input/basic-editing.md | drafted |
-| quantity-input/validation-and-conversions.md | not started |
-| quantity-input/conversion-popover.md | not started |
-| quantity-input/spreadsheet-integration.md | not started |
-| cross-cutting/accessibility-and-layout.md | not started |
+| quantity-input/validation-and-conversions.md | drafted |
+| quantity-input/conversion-popover.md | drafted |
+| quantity-input/spreadsheet-integration.md | drafted |
+| cross-cutting/accessibility-and-layout.md | drafted |
 | verification/ (1 checklist) | not started |
 | bug-triage.md | not started |
 

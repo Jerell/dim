@@ -404,8 +404,14 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
     const tokens = try scanner.scanTokens();
     if (scanner.hadError) return;
 
-    // Handle commands using tokens (post-tokenization)
+    // Handle commands using tokens (post-tokenization). A command must consume
+    // the whole line; otherwise a typo such as `show d extra` must not perform
+    // the command and silently discard the trailing text.
     if (tokens.len >= 1 and tokens[0].type == .List) {
+        if (tokens.len != 2 or tokens[1].type != .Eof) {
+            try err.writeAll("Invalid list command. Use `list`.\n");
+            return;
+        }
         const count = dim.constantsCount();
         var i: usize = 0;
         while (i < count) : (i += 1) {
@@ -418,7 +424,11 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
         }
         return;
     }
-    if (tokens.len >= 2 and tokens[0].type == .Show and tokens[1].type == .Identifier) {
+    if (tokens.len >= 1 and tokens[0].type == .Show) {
+        if (tokens.len != 3 or tokens[1].type != .Identifier or tokens[2].type != .Eof) {
+            try err.writeAll("Invalid show command. Use `show <name>`.\n");
+            return;
+        }
         const name = tokens[1].lexeme;
         if (dim.getConstant(name)) |u| {
             const unit_str = try dim.Format.normalizeUnitString(allocator, u.dim, name, dim.Registries.si);
@@ -429,13 +439,14 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
         }
         return;
     }
-    if (tokens.len >= 2 and tokens[0].type == .Clear and tokens[1].type == .All) {
-        dim.clearAllConstants();
-        try out.writeAll("ok\n");
-        return;
-    }
-    if (tokens.len >= 2 and tokens[0].type == .Clear and tokens[1].type == .Identifier) {
-        dim.clearConstant(tokens[1].lexeme);
+    if (tokens.len >= 1 and tokens[0].type == .Clear) {
+        const valid_all = tokens.len == 3 and tokens[1].type == .All and tokens[2].type == .Eof;
+        const valid_name = tokens.len == 3 and tokens[1].type == .Identifier and tokens[2].type == .Eof;
+        if (!valid_all and !valid_name) {
+            try err.writeAll("Invalid clear command. Use `clear <name>` or `clear all`.\n");
+            return;
+        }
+        if (valid_all) dim.clearAllConstants() else dim.clearConstant(tokens[1].lexeme);
         try out.writeAll("ok\n");
         return;
     }
@@ -505,6 +516,28 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
         }
         try flushAll(out, err);
     }
+}
+
+test "constant commands reject trailing tokens" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var define_out: std.Io.Writer.Allocating = .init(allocator);
+    defer define_out.deinit();
+    var define_err: std.Io.Writer.Allocating = .init(allocator);
+    defer define_err.deinit();
+    try run(allocator, &define_out.writer, &define_err.writer, "cli_test_d = (24 h)");
+
+    var command_out: std.Io.Writer.Allocating = .init(allocator);
+    defer command_out.deinit();
+    var command_err: std.Io.Writer.Allocating = .init(allocator);
+    defer command_err.deinit();
+    try run(allocator, &command_out.writer, &command_err.writer, "show cli_test_d extra");
+
+    try std.testing.expectEqual(@as(usize, 0), command_out.written().len);
+    try std.testing.expectEqualStrings("Invalid show command. Use `show <name>`.\n", command_err.written());
+    dim.clearConstant("cli_test_d");
 }
 
 test "fractional exponent on squared quantity works (sqrt area -> length)" {

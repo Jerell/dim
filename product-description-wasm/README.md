@@ -108,8 +108,8 @@ Status is one of `not started`, `drafted`, or `verified`.
 | api/recovery.md | drafted |
 | api/formatting.md | drafted |
 | cross-cutting/browser-loading.md | drafted |
-| verification/ (1 checklist) | not started |
-| bug-triage.md | not started |
+| verification/ (1 checklist) | drafted |
+| bug-triage.md | drafted |
 
 ## Reference
 

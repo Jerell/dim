@@ -108,8 +108,8 @@ Status is one of `not started`, `drafted`, or `verified`.
 | library/display-quantities.md | drafted |
 | library/formatting.md | drafted |
 | cross-cutting/compile-time-safety.md | drafted |
-| verification/ (1 checklist) | not started |
-| bug-triage.md | not started |
+| verification/ (1 checklist) | drafted |
+| bug-triage.md | drafted |
 
 ## Reference
 

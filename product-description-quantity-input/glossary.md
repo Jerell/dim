@@ -8,6 +8,10 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Story.** One named Storybook scenario with its own props and render function. This description covers Default, Invalid, and Spreadsheet.
 
+**Story decorator.** A wrapper that surrounds a Storybook story before it renders. Here it places the stories inside `DimProvider` and a fixed-width container, and supplies the loading fallback.
+
+**Prop.** A value supplied by a parent to configure a React component. A prop update can change the field's displayed value, declared unit, conversion list, locale, or callbacks.
+
 **QuantityInput.** The square-edged text field that accepts a quantity expression and exposes an info button for converted values. It displays one field value while the runtime evaluates that value in the background.
 
 **Conversion.** A requested output unit and optional label and decimal-place rule. For example, `kPa` with one decimal place turns a valid pressure into text such as `100.0` and `kPa`.
@@ -19,6 +23,8 @@ The vocabulary used across these documents. When a document uses one of these wo
 **Declared unit.** The unit against which a field's expression is checked, `bar` in the covered stories. A bare number is interpreted using this unit.
 
 **Expression.** The text evaluated by the dim runtime. A non-empty bare number is expanded to a number followed by the declared unit; text containing other characters is evaluated as entered.
+
+**Evaluation.** The runtime operation that interprets an expression and produces a number, boolean, or quantity result, or reports an error.
 
 **Raw value.** The exact string in the input, including a bare number or full expression. `onValueChange` receives this string rather than a parsed quantity.
 

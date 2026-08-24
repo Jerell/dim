@@ -106,8 +106,8 @@ Status is one of `not started`, `drafted`, or `verified`.
 | quantity-input/conversion-popover.md | drafted |
 | quantity-input/spreadsheet-integration.md | drafted |
 | cross-cutting/accessibility-and-layout.md | drafted |
-| verification/ (1 checklist) | not started |
-| bug-triage.md | not started |
+| verification/ (1 checklist) | drafted |
+| bug-triage.md | drafted |
 
 ## Reference
 

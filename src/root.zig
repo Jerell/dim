@@ -36,7 +36,7 @@ pub const LiteralValue = @import("parser/expressions.zig").LiteralValue;
 pub const Expr = @import("parser/expressions.zig").Expr;
 pub const RuntimeError = @import("parser/expressions.zig").RuntimeError;
 pub const ParseError = @import("parser/parser.zig").ParseError;
-pub const EvaluationError = error{ParseError} || RuntimeError;
+pub const EvaluationError = ParseError || RuntimeError;
 pub const ConstantEntry = struct {
     name: []const u8,
     unit: Unit,
@@ -157,18 +157,15 @@ pub fn evaluateWithContext(
 ) EvaluationError!LiteralValue {
     const arena_alloc = ctx.scratchAllocator();
 
-    var scanner = Scanner.init(arena_alloc, err_writer, source) catch return error.OutOfMemory;
-    const tokens = scanner.scanTokens() catch return error.OutOfMemory;
-    if (scanner.hadError) return error.ParseError;
+    var scanner = Scanner.init(arena_alloc, err_writer, source) catch |err| return err;
+    const tokens = scanner.scanTokens() catch |err| return err;
+    if (scanner.hadError) return error.InvalidToken;
     var parser = Parser.init(arena_alloc, tokens, err_writer);
-    const expr = parser.parseDetailed() catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => return error.ParseError,
-    };
-    if (parser.hadError) return error.ParseError;
+    const expr = parser.parseDetailed() catch |err| return err;
+    if (parser.hadError) return error.ExpectedExpression;
     if (tokens[parser.current].type != .Eof) {
         reportTokenError(arena_alloc, tokens[parser.current], "Unexpected token", err_writer);
-        return error.ParseError;
+        return error.UnexpectedToken;
     }
     const result = expr.evaluateInContext(arena_alloc, ctx) catch |err| return err;
 
@@ -190,6 +187,8 @@ pub fn evaluateWithContext(
 /// Evaluate a string expression with typed parse, runtime, and allocation errors.
 /// This form uses the calling thread's default context. Embedders that need
 /// isolation or concurrency should use `evaluateWithContext`.
+/// The returned LiteralValue owns any copied `.unit` or `.string` bytes using
+/// `allocator`; call `deinitLiteralValue(allocator, &value)` when finished.
 pub fn evaluate(allocator: std.mem.Allocator, source: []const u8, err_writer: ?*std.Io.Writer) EvaluationError!LiteralValue {
     return evaluateWithContext(currentContext(), allocator, source, err_writer);
 }
@@ -467,13 +466,21 @@ test "pressure quantity arithmetic mirrors absolute and delta rules" {
 
 test "evaluation preserves parse and runtime error categories" {
     try std.testing.expectError(
-        error.ParseError,
+        error.UnexpectedToken,
         evaluate(std.testing.allocator, "1 m trailing", null),
     );
     try std.testing.expectError(
         error.DivisionByZero,
         evaluate(std.testing.allocator, "1 / 0", null),
     );
+
+    var diagnostics: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer diagnostics.deinit();
+    try std.testing.expectError(
+        error.ExpectedToken,
+        evaluate(std.testing.allocator, "x = 2 m", &diagnostics.writer),
+    );
+    try std.testing.expect(std.mem.containsAtLeast(u8, diagnostics.written(), 1, "Parse error: error.ExpectedToken"));
 }
 
 test "context-scoped constants do not leak across contexts" {

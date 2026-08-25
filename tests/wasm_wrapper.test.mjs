@@ -3,6 +3,8 @@ import {
   batchConvertValues,
   clearAllConsts,
   convertValue,
+  DIM_STATUS,
+  DimWasmError,
   evalStructured,
   formatEvalResult,
   initDim,
@@ -23,6 +25,20 @@ if (convertValue(1, "bar", "Pa") !== 100000) {
 }
 if (!isCompatible("1 m", "km")) {
   throw new Error("compatibility check failed");
+}
+
+for (const [expression, status] of [
+  ["1 m trailing", DIM_STATUS.parseError],
+  ["1 / 0", DIM_STATUS.divisionByZero],
+]) {
+  try {
+    evalStructured(expression);
+    throw new Error(`expected ${expression} to fail`);
+  } catch (error) {
+    if (!(error instanceof DimWasmError) || error.status !== status) {
+      throw new Error(`unexpected status for ${expression}: ${error}`);
+    }
+  }
 }
 
 const batch = batchConvertValues([

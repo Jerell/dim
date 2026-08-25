@@ -52,7 +52,7 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Recovery interrupt.** `recoverDim` releases the current context and makes existing runtime state unavailable while a new initialization runs.
 
-**Runtime failure.** Loading, export validation, context creation, status checking, or WASM execution fails and the wrapper throws a JavaScript error.
+**Runtime failure.** Loading, export validation, context creation, status checking, or WASM execution fails. Status-checked calls throw `DimWasmError` with a numeric category; compatibility predicates retain their boolean false failure contract.
 
 **Page teardown.** A page, worker, or module lifetime ends before a promise or call completes. The wrapper does not persist runtime state.
 

@@ -4,7 +4,7 @@ You are working in the `product-description-quantity-input` repo. Read `README.m
 
 ## Source of truth
 
-The source repo is `/Users/jerell/Repos/dim`, commit `c26ec6a`. Describe the Storybook `dim/QuantityInput` story set—Default, Invalid, and Spreadsheet—with the default story configuration. The standalone provider, registry installation, WASM ABI, and arbitrary consumer integrations are out of scope.
+The source repo is `/Users/jerell/Repos/dim`, revision commit `5d9cf0d`. Describe the Storybook `dim/QuantityInput` story set—Default, Invalid, and Spreadsheet—with the default story configuration. The standalone provider, registry installation, WASM ABI, and arbitrary consumer integrations are out of scope.
 
 Read in this order:
 
@@ -25,7 +25,7 @@ Describe what the user sees and does, not React implementation. Use `> Technical
 - State surprising behavior plainly. Put suspected defects in open questions and then bug-triage.md.
 - Cross-reference foundations instead of repeating their rules.
 - Include one Mermaid `stateDiagram-v2` per interaction.
-- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`c26ec6a\`.`
+- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`5d9cf0d\`.`
 - Do not alter runtime source files while drafting.
 
 ## Things already established

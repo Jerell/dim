@@ -94,4 +94,4 @@ Text is written to the caller's writer. Formatting does not allocate a persisten
 - Exact precision/rounding expectations in all modes need representative output checks.
 - Alias selection for equally valid units may be a product decision.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

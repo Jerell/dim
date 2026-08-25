@@ -26,7 +26,7 @@ The consumer selects a built-in namespace, registry, alias, prefix, or runtime s
 
 ### Compile or return immediately
 
-Comptime units and dimensions are checked by Zig. `Quantity.from` rejects mismatched unit dimensions at compile time. Checked unit composition returns `AffineUnitCombination`; unchecked composition asserts that participants are non-affine.
+Comptime units and dimensions are checked by Zig. `Quantity.from` rejects mismatched unit dimensions at compile time. Unit composition returns `UnitCompositionError!Unit` and returns `AffineUnitCombination` when a participant is affine.
 
 ### Begin execution
 
@@ -45,7 +45,7 @@ The caller receives a unit, a converted number, or a typed quantity. The unit sy
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Namespace/comptime unit versus dynamic symbol determines validation boundary. | Resolved unit does not change. |
-| Checked or unchecked operation | Checked composition returns errors; unchecked asserts. | Fixed for the call. |
+| Checked or unchecked operation | Unit composition is fallible; Quantity unchecked variants are a separate API. | Fixed for the call. |
 | Dimension and quantity type | Target quantity type must match unit dimension. | No effect. |
 | Registry and format mode | Registry controls lookup and formatting selection. | Later formatting can choose another registry. |
 | Affine or delta state | Unit offset and quantity delta choose conversion rule. | Current conversion uses captured state. |
@@ -58,7 +58,7 @@ The caller receives a unit, a converted number, or a typed quantity. The unit sy
 | Compile-time rejection | Build stops. | No cancellation. |
 | Caller doing another operation | Caller can choose another unit. | Current operation completes synchronously. |
 | Operation completes before extension | Exact lookup returns immediately. | No partial unit is exposed. |
-| Runtime error or panic | Dynamic mismatch/checked affine error is returned. | Unchecked affine composition can assert. |
+| Runtime error or panic | Dynamic mismatch or affine composition returns an error. | Unit composition does not assert for affine inputs. |
 | Allocator failure or resource teardown | Basic unit construction does not allocate. | No effect. |
 | Input value/type/unit changing | Later calls use new input. | Current unit/result remains fixed. |
 | Second context or thread using same state | Explicit contexts isolate constants. | Independent unit values remain independent. |
@@ -71,7 +71,7 @@ The caller receives a unit, a converted number, or a typed quantity. The unit sy
 
 **Units and registries.** Lookup and composition are the central behavior here.
 
-**Affine and delta semantics.** Offsets are never carried through checked composition.
+**Affine and delta semantics.** Offsets are never carried through Unit composition; affine participants return an error.
 
 **Formatting.** Caller symbols and registry normalization determine output.
 
@@ -89,10 +89,11 @@ The caller receives a unit, a converted number, or a typed quantity. The unit sy
 - Prefixed affine units are not resolved.
 - Unit composition with an affine participant requires checked handling or risks assertion.
 - `Unit.to` compile-time-checks quantity dimensions.
+- Container-level composed units use `catch unreachable` when their inputs are known non-affine.
 
 ## Open questions and verification
 
 - Custom registry ordering and alias collisions need external-consumer tests.
 - The ergonomics of a caller-supplied composed symbol needs documentation review.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

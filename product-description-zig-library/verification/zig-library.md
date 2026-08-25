@@ -39,7 +39,7 @@ Run `zig build test` from the source checkout. Use temporary consumer fixtures f
 | ID | P | Device | Claim | Setup | Steps | Expected | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | EVAL-01 | P1 | consumer fixture | String evaluation returns a converted display quantity ([return](../library/runtime-evaluation.md#return)). | Allocator and expression. | 1. Evaluate `100 km/h as m/s`.<br>2. Format and deinitialize. | Result is approximately 27.7778 m/s and cleanup succeeds. | — |
-| EVAL-02 | P1 | consumer fixture | Invalid expression returns null ([compile or return immediately](../library/runtime-evaluation.md#compile-or-return-immediately)). | Error writer optional. | 1. Evaluate malformed source.<br>2. Inspect optional result. | No result is returned. | — |
+| EVAL-02 | P1 | consumer fixture | Invalid expression returns a granular parse error ([compile or return immediately](../library/runtime-evaluation.md#compile-or-return-immediately)). | Error writer optional. | 1. Evaluate malformed source.<br>2. Inspect error and diagnostics. | No result is returned; the parse error and generic diagnostic are available. | — |
 
 ## library/contexts-and-constants.md
 
@@ -68,4 +68,4 @@ Run `zig build test` from the source checkout. Use temporary consumer fixtures f
 Not checkable by hand:
 
 - Whether compiler diagnostics are understandable enough for consumers.
-- Whether unchecked affine operations are sufficiently discoverable as unsafe.
+- Whether Quantity unchecked preconditions are sufficiently discoverable as unsafe.

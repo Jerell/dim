@@ -27,7 +27,7 @@ The consumer chooses a comptime unit namespace or a runtime registry lookup. A u
 
 ### Compile or return immediately
 
-Comptime `Unit` methods can derive dimensions and scales immediately. `from` rejects a dimension mismatch at compile time. Checked composition rejects affine participants with `AffineUnitCombination`; unchecked composition asserts that both units are multiplicative.
+Comptime `Unit` methods can derive dimensions and scales immediately. `from` rejects a dimension mismatch at compile time. Unit composition returns `UnitCompositionError!Unit` and rejects affine participants with `AffineUnitCombination`.
 
 ### Begin execution
 
@@ -46,7 +46,7 @@ The consumer receives a `Unit`, a typed quantity, a converted number, or an erro
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Comptime namespace gives compile-time checks; lookup resolves at runtime. | A resolved unit value does not change. |
-| Checked or unchecked operation | Checked composition returns affine errors; unchecked composition asserts. | Method choice is fixed. |
+| Checked or unchecked operation | Unit composition always returns an affine-combination error when unsafe; Quantity variants have their own checked/unchecked methods. | Method choice is fixed. |
 | Dimension and quantity type | Quantity construction requires matching unit dimension. | No effect. |
 | Registry and format mode | Registry selection determines lookup/format choices. | A later formatting call can use another registry. |
 | Affine or delta state | Unit offset determines absolute conversion; delta flag selects scale-only conversion. | Delta state belongs to the quantity conversion call. |
@@ -59,7 +59,7 @@ The consumer receives a `Unit`, a typed quantity, a converted number, or an erro
 | Compile-time rejection | The program fails to compile. | No mutation of the unit is possible. |
 | Caller doing another operation | The caller can select another registry or unit. | Current conversion completes synchronously. |
 | Operation completes before extension | Exact lookup and simple conversion return immediately. | No partial unit is returned. |
-| Runtime error or panic | Dynamic mismatch or checked affine composition returns an error. | Unchecked affine composition can assert. |
+| Runtime error or panic | Dynamic mismatch or affine composition returns an error. | No Unit composition assertion is required. |
 | Allocator failure or resource teardown | Basic unit values do not allocate. | Only later owned formatting/evaluation may need cleanup. |
 | Input value/type/unit changing | A later lookup sees new input. | Current conversion uses captured unit values. |
 | Second context or thread using same state | Explicit contexts isolate constants. | Independent lookups remain independent. |
@@ -72,7 +72,7 @@ The consumer receives a `Unit`, a typed quantity, a converted number, or an erro
 
 **Units and registries.** This document owns exact/alias/prefix lookup and built-in registry ordering.
 
-**Affine and delta semantics.** Offsets apply to absolute values only; checked composition prevents meaningless affine products.
+**Affine and delta semantics.** Offsets apply to absolute values only; Unit composition rejects meaningless affine products.
 
 **Formatting.** Unit symbols and registries determine displayed unit text.
 
@@ -96,4 +96,4 @@ The consumer receives a `Unit`, a typed quantity, a converted number, or an erro
 - The ordering among similarly named units in all built-in registries should be checked with representative lookup cases.
 - The user-facing behavior of a custom extra registry is outside the default verification pass.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

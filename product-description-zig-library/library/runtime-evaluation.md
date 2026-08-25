@@ -2,11 +2,11 @@
 
 ## Summary
 
-Runtime evaluation turns a string expression into a `LiteralValue` through `evaluate` or `evaluateWithContext`. It accepts numeric and quantity expressions, arithmetic, conversions, comparisons, constants, and formatting suffixes. The caller receives a value or null and may provide an error writer for diagnostics.
+Runtime evaluation turns a string expression into a `LiteralValue` through `evaluate` or `evaluateWithContext`. It accepts numeric and quantity expressions, arithmetic, conversions, comparisons, constants, and formatting suffixes. The caller receives `EvaluationError!LiteralValue` and may provide an error writer for diagnostics.
 
 ## The simple case
 
-Call `dim.evaluate(allocator, "100 km/h as m/s", null)`. On success the result contains a display quantity with the converted value and unit. Format it, then call `deinitLiteralValue` to release its copied unit string.
+Call `try dim.evaluate(allocator, "100 km/h as m/s", null)`. On success the result contains a display quantity with the converted value and unit. Format it, then call `deinitLiteralValue` to release its copied unit string.
 
 ## The interaction, event by event
 
@@ -26,7 +26,7 @@ The caller supplies an allocator, source string, optional error writer, and opti
 
 ### Compile or return immediately
 
-The parser scans and parses the complete source before evaluation. Invalid syntax or trailing tokens returns null and can write diagnostics. No partial literal result is returned.
+The parser scans and parses the complete source before evaluation. Invalid syntax or trailing tokens return granular parse errors and write diagnostics. No partial literal result is returned.
 
 ### Begin execution
 
@@ -38,7 +38,7 @@ Intermediate allocations live in context scratch storage. A runtime error such a
 
 ### Return
 
-On success the result allocator receives copied strings and display quantities. On failure the API returns null, so callers that need error categories must use lower-level typed APIs or inspect diagnostics. The caller deinitializes any owned literal value.
+On success the result allocator receives copied strings and display quantities. On failure the API returns a typed parse, runtime, or allocation error. The caller deinitializes any owned literal value.
 
 ## Modifiers
 
@@ -57,8 +57,8 @@ On success the result allocator receives copied strings and display quantities. 
 | --- | --- | --- |
 | Compile-time rejection | No compile-time expression rejection; source can fail at parse. | No cancellation hook. |
 | Caller doing another operation | Caller can submit another source. | Synchronous evaluation finishes before the next call. |
-| Operation completes before extension | Empty/invalid input returns without a result. | No partial result is promised. |
-| Runtime error or panic | Parse/eval failure returns null. | Error aborts current result; diagnostics may be written. |
+| Operation completes before extension | Invalid input returns a typed error without a result. | No partial result is promised. |
+| Runtime error or panic | Parse/eval failure returns a typed error. | Error aborts current result; diagnostics may be written. |
 | Allocator failure or resource teardown | Null may be returned on allocation failure. | Caller must preserve allocator/context lifetime through return. |
 | Input value/type/unit changing | A later source is independent. | Current source is copied/read from scratch storage. |
 | Second context or thread using same state | Explicit contexts isolate constants. | Default context is thread-local; shared explicit context needs protection. |
@@ -85,14 +85,14 @@ On success the result allocator receives copied strings and display quantities. 
 
 ## Edge cases
 
-- Null conflates parse, runtime, and allocation failure in the convenience API.
+- Parse errors retain their granular error-set variants; diagnostics also include the generic parse failure line.
 - A successful assignment can mutate context constants while returning a value.
 - Trailing tokens are rejected by the explicit evaluation path.
 - Rational powers can return dimensions with fractional exponents.
 
 ## Open questions and verification
 
-- Error categorization for callers that receive null needs a product/API documentation decision.
+- Allocation failure paths are not covered by ordinary consumer tests.
 - Allocation failure paths are not covered by ordinary consumer tests.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

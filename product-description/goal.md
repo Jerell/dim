@@ -24,7 +24,7 @@ Describe the experience, not the code. Technical detail belongs only in `> Techn
 - State surprising behavior plainly. Put suspected defects in open questions and in bug-triage.md after the full draft.
 - Cross-reference foundation documents instead of repeating their rules.
 - Include one Mermaid `stateDiagram-v2` per interaction.
-- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`c9c1957\`.`
+- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`5d9cf0d\`.`
 - Do not alter runtime source files.
 
 ## Things already established

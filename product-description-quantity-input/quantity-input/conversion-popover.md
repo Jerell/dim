@@ -100,4 +100,4 @@ Closing the panel hides only the panel. It does not emit a value callback, clear
 - The exact screen-reader announcement for the portal popup needs accessibility verification.
 - The panel's behavior when conversions change while it is open needs a browser pass.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

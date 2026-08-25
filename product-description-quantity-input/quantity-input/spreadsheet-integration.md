@@ -102,4 +102,4 @@ The row update finishes when the parent array has been rendered with the new raw
 - The lack of per-row input labels may be worth treating as an accessibility bug rather than documenting as intended.
 - The story's controlled update is synchronous in the render function; delayed parent updates are out of scope and untested.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

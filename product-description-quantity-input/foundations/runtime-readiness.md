@@ -15,7 +15,7 @@ If initialization fails and the decorator supplies no error fallback, the provid
 ```mermaid
 stateDiagram-v2
     [*] --> loading
-    loading --> ready : WASM initializes
+    loading --> ready : WASM initializes and provider constants register
     loading --> error : initialization rejects
     ready --> loading : recovery or new initialization
     error --> loading : retry
@@ -24,7 +24,7 @@ stateDiagram-v2
 
 ### Arrive
 
-The provider starts with status `loading`, error `null`, and `ready` false. Its first initialization uses the normal runtime initializer. The Storybook decorator passes `loadingFallback={<p>Loading dim…</p>}`, so the canvas may show that fallback instead of the story children until the provider is ready.
+The provider starts with status `loading`, error `null`, and `ready` false. Its first initialization uses the normal runtime initializer and registers declared constants before setting ready. The Storybook decorator passes `loadingFallback={<p>Loading dim…</p>}`, so the canvas may show that fallback instead of the story children until the provider is ready.
 
 ### Leave untouched
 
@@ -36,7 +36,7 @@ An input change while the provider is not ready changes the raw value but cannot
 
 ### While editing
 
-When readiness becomes true, the field evaluates its current expression and checks compatibility. If recovery occurs after an error, the provider retries initialization and the current fields can evaluate again. Constants supplied to the provider are defined after ready; this description does not treat provider constants as a component feature.
+When readiness becomes true, the field evaluates its current expression and checks compatibility. If recovery occurs after an error, the provider retries initialization and the current fields can evaluate again. Provider constants are registered before the provider exposes ready, so consumers observing ready can immediately evaluate expressions that use them; constants remain outside the component-only feature scope.
 
 If initialization or evaluation fails, no converted values are shown. Initialization error fallback is a provider-level choice; the QuantityInput conversion panel has its own invalid/loading presentation for field-level failures.
 
@@ -100,4 +100,4 @@ Readiness is not a user commit. Once ready, the field can finish normal editing 
 - Whether shared runtime state leaks between stories during one Storybook session needs verification.
 - Provider-level initialization error behavior is only partially visible in the covered story set.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

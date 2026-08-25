@@ -112,4 +112,4 @@ Because constants are process-local, an interrupt never leaves a recoverable par
 - Command recognition with trailing tokens may accept input more broadly than users expect; this may be worth treating as a product bug rather than documenting.
 - Signal behavior during a very fast evaluation was not confirmed in a real terminal.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

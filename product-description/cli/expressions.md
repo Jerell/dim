@@ -102,4 +102,4 @@ The result is formatted and printed with a newline. No expression result is pers
 - The exact error text and process status for each runtime error need binary verification.
 - The boundary between numeric multiplication and unit-expression multiplication in ambiguous input deserves hand tests.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

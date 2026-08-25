@@ -101,4 +101,4 @@ State changes are visible through styling, `aria-invalid`, and the next popover 
 - The visual timing between an input event and the effect-driven state update needs browser verification.
 - The exact error text for malformed expressions depends on the WASM wrapper and needs hand verification.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

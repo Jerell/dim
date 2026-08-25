@@ -11,7 +11,7 @@ These checklists compare the CLI documents with the built `dim` binary one obser
 ## How to run a pass
 
 1. Build with `zig build` from `/Users/jerell/Repos/dim` and use `zig-out/bin/dim`.
-2. Confirm `git -C /Users/jerell/Repos/dim rev-parse --short HEAD` matches the footer (`c9c1957`).
+2. Confirm `git -C /Users/jerell/Repos/dim rev-parse --short HEAD` matches the footer (`5d9cf0d`).
 3. Run P1 items first, then P2 and P3. Use a real TTY for REPL items and pipes/files for batch items.
 4. Record `pass`, `fail`, or `blocked` in the Result column. File every fail in `bug-triage.md`; a fail may mean the document is wrong rather than the product.
 5. A document becomes `verified` only after every P1 and P2 item has passed or been filed.

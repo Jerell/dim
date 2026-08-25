@@ -72,7 +72,7 @@ A single evaluation resets the FFI arena in `finally`, but the JavaScript result
 
 **WASM memory and FFI reset.** The wrapper copies results before resetting scratch allocations.
 
-**Errors and status codes.** Non-OK status becomes a JavaScript error for most operations.
+**Errors and status codes.** Non-OK status becomes a `DimWasmError` for most operations; its `status` distinguishes parse errors, runtime errors such as division by zero, and out-of-memory.
 
 **Contexts and constants.** The default context persists constants until recovery or clearing.
 
@@ -100,4 +100,4 @@ A single evaluation resets the FFI arena in `finally`, but the JavaScript result
 - Concurrent `recoverDim` and evaluation behavior is not covered by tests and may need a product decision.
 - The source test exercises Node loading, not a real browser's module-relative URL behavior.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

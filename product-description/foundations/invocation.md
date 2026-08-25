@@ -107,4 +107,4 @@ The CLI has no documented signal handler that converts interruptions into a user
 - The exact exit status for missing or unreadable files was not confirmed by hand.
 - The host behavior for SIGPIPE, SIGHUP, and a second Ctrl+C was not confirmed in a real terminal.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

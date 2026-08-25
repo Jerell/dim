@@ -98,4 +98,4 @@ No configuration is saved when the process exits. A new invocation starts with t
 - The absence of undocumented environment-based behavior was inferred from the CLI source and was not checked against a clean shell environment.
 - The exact built-in registry precedence for ambiguous aliases is owned by the unit documents and remains to be verified with representative expressions.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

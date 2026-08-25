@@ -100,4 +100,4 @@ EOF, normal completion of a direct expression, or process termination ends the s
 - EOF behavior after a partially entered REPL line was not confirmed by hand.
 - The process status after an expression error in a batch session remains to be checked.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

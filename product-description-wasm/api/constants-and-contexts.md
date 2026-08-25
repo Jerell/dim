@@ -96,4 +96,4 @@ Clear calls remove logical state. `recoverDim` frees the context, so constants d
 - Shared-context concurrency and constant mutation ordering need a decision/documentation.
 - Whether callers need a list/read API is a product/API question.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

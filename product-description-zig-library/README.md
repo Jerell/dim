@@ -31,7 +31,7 @@ Each document uses the same skeleton for one public capability. The unit of inte
 1. **Summary.** What the API capability lets a consumer do and which public type or function exposes it.
 2. **The simple case.** The smallest compiling and running example.
 3. **The interaction, event by event.** The five library-operation phases: declare, compile or return immediately, begin execution, while executing, and return.
-4. **Modifiers.** The fixed API variant axis: compile-time or runtime unit, checked or unchecked operation, dimension/quantity type, registry and format mode, affine/delta state, and allocator/context.
+4. **Modifiers.** The fixed API variant axis: compile-time or runtime unit, fallible or unchecked Quantity operation, dimension/quantity type, registry and format mode, affine/delta state, and allocator/context.
 5. **Cancel and interrupt.** The fixed rows are: compile-time rejection; the caller doing another operation; an operation that completes before extension; runtime error or panic; allocator failure or resource teardown; input value/type/unit changing; and a second context or thread using the same state.
 6. **Interactions with other systems.** Compile-time safety; dimensions and rational exponents; units and registries; affine/delta semantics; formatting; allocators and ownership; contexts and constants; concurrency; and release/build configuration.
 7. **Edge cases.** Dimension mismatch, affine units, rational powers, empty or missing units, context isolation, and ownership boundaries.
@@ -58,7 +58,7 @@ The `verification/` directory contains checklists for public API claims. A scrip
 - **Defaults.** Built-in SI, Imperial, CGS, and industrial registries; standard Zig allocator behavior; no CLI, WASM, C ABI, or custom application wrapper.
 - **Interaction shape.** A library operation has phases declare, compile or return immediately, begin execution, while executing, and return. The modifier axis, interrupt rows, and cross-cutting order above are fixed.
 - **Out of scope.** CLI prompts and exit status, WebAssembly loading and JavaScript memory handling, React behavior, release packaging, and undocumented internal functions.
-- **Source.** `/Users/jerell/Repos/dim` at commit `811dcf0` when this description was scaffolded.
+- **Source.** `/Users/jerell/Repos/dim` at revision commit `5d9cf0d`; this revision updates the description after merged API fixes.
 - **Repository location.** This is a separate description directory inside the source checkout.
 
 ## Structure
@@ -113,7 +113,7 @@ Status is one of `not started`, `drafted`, or `verified`.
 
 ## Reference
 
-The source of truth is `/Users/jerell/Repos/dim` at commit `811dcf0`.
+The source of truth for this revision is `/Users/jerell/Repos/dim` at commit `5d9cf0d`.
 
 - `src/root.zig`: public exports, contexts, string evaluation, unit lookup, registries, and constants.
 - `src/quantity.zig`: typed quantity construction, arithmetic, powers, scaling, and formatting wrappers.

@@ -6,7 +6,7 @@ The library combines value types with allocator-owned runtime strings and contex
 
 ## The simple case
 
-Call `dim.evaluate(allocator, "100 km/h as m/s", null)`. On success, the consumer receives a `LiteralValue`; if it contains a display quantity, the consumer formats it and calls `dim.deinitLiteralValue` before discarding it. An explicit `DimContext` must also be deinitialized when its owner is finished.
+Call `try dim.evaluate(allocator, "100 km/h as m/s", null)`. On success, the consumer receives a `LiteralValue`; if it contains a display quantity, the consumer formats it and calls `dim.deinitLiteralValue` before discarding it. Parse, runtime, and allocation failures are returned as typed errors. An explicit `DimContext` must also be deinitialized when its owner is finished.
 
 ## The interaction, event by event
 
@@ -26,7 +26,7 @@ The consumer chooses an allocator for returned values and, for isolated runtime 
 
 ### Compile or return immediately
 
-Compile-time mismatches are rejected before allocation or execution. Runtime constructors and checked operations return explicit errors such as `DimensionMismatch`, `MulDivTemperatureDelta`, and `AffineUnitCombination`. `evaluate` returns null on parse/evaluation failure rather than an error union.
+Compile-time mismatches are rejected before allocation or execution. Runtime constructors and operations return explicit errors such as `DimensionMismatch`, `MulDivTemperatureDelta`, and `AffineUnitCombination`. `evaluate` returns `EvaluationError!LiteralValue`, preserving parse, runtime, and allocation failures.
 
 ### Begin execution
 
@@ -34,7 +34,7 @@ An explicit context resets scratch storage before expression evaluation. The res
 
 ### While executing
 
-Intermediate parser and runtime storage belongs to the context's scratch arena. A failed operation can return null or an error after partial scratch allocation; the context remains usable. A context's constants arena persists until clear/deinit.
+Intermediate parser and runtime storage belongs to the context's scratch arena. A failed operation can return an error after partial scratch allocation; the context remains usable. A context's constants arena persists until clear/deinit.
 
 ### Return
 
@@ -45,7 +45,7 @@ The caller owns the allocator-backed result it requested and must call the match
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Typed construction has no result allocator; dynamic/evaluation paths may allocate. | Ownership does not change during a call. |
-| Checked or unchecked operation | Checked paths return errors; unchecked paths may assert and do not create recovery state. | Cannot change method behavior mid-call. |
+| Checked or unchecked operation | Quantity unchecked variants assume their preconditions; Unit composition always returns `UnitCompositionError`. | Cannot change method behavior mid-call. |
 | Dimension and quantity type | Typed values are allocation-free; display/runtime values may own strings. | No effect on existing ownership. |
 | Registry and format mode | Formatting can allocate normalized text and choose registry output. | A later format call may allocate separately. |
 | Affine or delta state | May determine whether an error is returned. | Current result retains its delta state. |
@@ -58,7 +58,7 @@ The caller owns the allocator-backed result it requested and must call the match
 | Compile-time rejection | No allocations or cleanup are needed. | No type operation can be cancelled. |
 | Caller doing another operation | Caller can reuse an allocator/context according to its ownership rules. | Scratch work is not a second result; later calls may reset it. |
 | Operation completes before extension | Plain typed values return without cleanup. | No partial owned result is promised. |
-| Runtime error or panic | Caller receives null/error where the API provides it. | Unchecked assertions can terminate instead of returning. |
+| Runtime error or panic | Caller receives a typed error where the API provides it. | Unchecked Quantity variants can still assume their preconditions. |
 | Allocator failure or resource teardown | Allocation can return an error/null before a result is delivered. | Caller must not deinit an uninitialized result; context teardown ends its storage. |
 | Input value/type/unit changing | New calls use new inputs. | Existing returned strings and values do not change. |
 | Second context or thread using same state | Explicit contexts isolate ownership and constants. | A shared context requires external coordination. |
@@ -85,7 +85,7 @@ The caller owns the allocator-backed result it requested and must call the match
 
 ## Edge cases
 
-- `evaluate` returning null does not provide a typed error reason through its optional API.
+- `evaluate` returns typed parse, runtime, and allocation errors; callers still need to deinitialize successful owned results.
 - A returned `LiteralValue` can contain an owned string or display quantity and must be passed to `deinitLiteralValue`.
 - `clearAllConstants` retains context capacity but removes logical state.
 - A result copy can outlive the context scratch arena when allocated with the caller's result allocator.
@@ -93,6 +93,5 @@ The caller owns the allocator-backed result it requested and must call the match
 ## Open questions and verification
 
 - Exact allocation behavior on every formatting path needs allocator-instrumented verification.
-- The distinction between recoverable null evaluation and error-union APIs should be made more explicit in public documentation.
-
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+- Allocation-failure behavior still needs allocator-instrumented verification.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

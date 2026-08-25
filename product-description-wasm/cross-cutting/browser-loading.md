@@ -97,4 +97,4 @@ Recovery repeats loading and instantiation after freeing the old context. The pa
 - Cache behavior with service workers and no-cache fetches needs verification.
 - Asset corruption and truncated base64 error messages need a product review.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

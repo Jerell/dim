@@ -11,7 +11,7 @@ These checklists compare the Zig library documents with consumer code compiled a
 ## How to run a pass
 
 1. From `/Users/jerell/Repos/dim`, run `zig build test`.
-2. Confirm the source commit matches the feature footers (`811dcf0` for this draft snapshot).
+2. Confirm the source commit matches the feature footers (`5d9cf0d` for this revision).
 3. Run scripted checks first, then compile external-style examples and inspect compiler failures for compile-time claims.
 4. Record `pass`, `fail`, or `blocked`. A failed claim may indicate an incorrect document rather than a library defect.
 5. Mark a document verified only when its P1/P2 items pass or are filed.
@@ -29,4 +29,4 @@ The public library has no standalone UI. `zig build test` and consumer fixtures 
 
 ## Results so far
 
-A scripted pass ran on 2026-08-24: `zig build test` passed. It covered internal library tests, external consumer tests, CLI tests, fuzz smoke tests, and WASM-related build graph tests. No standalone external compile-failure fixture or allocator-instrumented pass has run, so no document is marked verified.
+An automated pass for this revision ran on 2026-08-25: `zig build test` passed, including the external consumer's fallible Unit composition checks and typed evaluation errors. No standalone compile-failure fixture, allocator-instrumented pass, or hand verification has run, so no document is marked verified.

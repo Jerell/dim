@@ -43,7 +43,7 @@ Draft from `src/main.zig`, the parser and expression evaluator, formatting and r
 ### Scope decisions
 
 - **Surface.** The native `dim` CLI, version built from this repository, default configuration, POSIX-like shell semantics, and a TTY unless a document says otherwise.
-- **Source of truth.** `/Users/jerell/Repos/dim`, commit `c9c1957` at scaffold time.
+- **Source of truth.** `/Users/jerell/Repos/dim`, revision commit `5d9cf0d`; the CLI surface is unchanged by the API revisions covered here.
 - **Run command.** `zig-out/bin/dim`; build with `zig build` if the binary is absent. REPL verification uses an interactive terminal; batch verification uses pipes and `--file`.
 - **Out of scope.** Zig library APIs, C/Rust integration, WASM/browser APIs, React components, registry installation, custom unit registries, and non-default application embedding.
 - **Interaction shape.** The unit is an invocation with phases invoke, exit immediately, begin running, while running, and finish. The variant axis, interrupt list, and cross-cutting order above are fixed.
@@ -97,7 +97,7 @@ cross-cutting/
 
 ## Reference
 
-The source of truth is `/Users/jerell/Repos/dim` at commit `c9c1957`.
+The source of truth for this revision is `/Users/jerell/Repos/dim` at commit `5d9cf0d`.
 
 - `src/main.zig`: CLI argument dispatch, REPL, stdin/file reading, command handling, output, and CLI tests.
 - `src/parser/parser.zig`: token-to-expression grammar and parse errors.

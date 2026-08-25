@@ -106,4 +106,4 @@ The latest valid or invalid state is sent to `onResultChange` after state update
 - The exact visual interval in which stale conversion rows might remain before the effect runs needs browser verification.
 - Whether all runtime error messages are user-appropriate is a product review question.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

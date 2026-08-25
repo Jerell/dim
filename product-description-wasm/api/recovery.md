@@ -94,4 +94,4 @@ This phase is the operation's commit: old context is released and new readiness 
 - Concurrent recovery semantics are not defined and may need an explicit guard.
 - Browser behavior when recovery is triggered during page navigation needs a harness.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

@@ -4,7 +4,7 @@ You are working in the `product-description-wasm` repo. Read `README.md`, `gloss
 
 ## Source of truth
 
-The source repo is `/Users/jerell/Repos/dim`, commit `811dcf0`. The surface is `wasm/dim.ts` plus the generated `dim_wasm.wasm` artifact and its shipped base64 copy. Zig internals, CLI, C ABI, React, and application UI are out of scope.
+The source repo is `/Users/jerell/Repos/dim`, commit `5d9cf0d`. The surface is `wasm/dim.ts` plus the generated `dim_wasm.wasm` artifact and its shipped base64 copy. Zig internals, CLI, C ABI, React, and application UI are out of scope.
 
 Read in this order:
 
@@ -23,7 +23,7 @@ Describe calls, returned JavaScript objects, thrown errors, runtime state, and c
 - State when an operation is synchronous after initialization and when initialization/recovery is asynchronous.
 - Cross-reference lifecycle, memory, and normalization foundations rather than repeating them.
 - Include one Mermaid `stateDiagram-v2` per interaction.
-- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`811dcf0\`.`
+- End with `## Open questions and verification` and `Verified against /Users/jerell/Repos/dim commit \`5d9cf0d\`.`
 - Do not modify source code while drafting.
 
 ## Things already established
@@ -34,7 +34,7 @@ Describe calls, returned JavaScript objects, thrown errors, runtime state, and c
 - Single operations copy result values and strings before `dim_ffi_reset` runs in `finally`.
 - Text inputs are UTF-8 encoded and normalized for middle dots, superscripts, and scientific notation before WASM receives them.
 - Batch conversion returns an empty array without requiring a runtime for an empty input array; non-empty batches require readiness and check each item status.
-- `isCompatible` and `sameDimension` return false for non-OK status rather than throwing.
+- `isCompatible` and `sameDimension` return false for non-OK status rather than throwing; other status-checked operations throw `DimWasmError` with a numeric `status` that distinguishes parse, runtime, and allocation failures.
 - Constants belong to the current runtime context and disappear after recovery.
 
 ## Order of work

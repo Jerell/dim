@@ -124,4 +124,4 @@ After an interruption the component stays on the same Storybook page while mount
 - Exact popover placement, focus return after dismissal, and Escape behavior were inferred from the primitive and need hand verification.
 - The source and tests do not establish whether browser autofill can write despite `autoComplete="off"`.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

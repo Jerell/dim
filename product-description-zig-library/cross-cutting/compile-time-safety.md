@@ -21,7 +21,7 @@ stateDiagram-v2
 
 ### Declare
 
-The consumer chooses generic types, comptime units, dynamic units, checked methods, or expression evaluation. The selected API determines whether safety is encoded in a type or returned at runtime.
+The consumer chooses generic types, comptime units, dynamic units, fallible methods, or expression evaluation. The selected API determines whether safety is encoded in a type or returned at runtime.
 
 ### Compile or return immediately
 
@@ -33,7 +33,7 @@ Compiled code enters runtime checks for dynamic unit dimensions, affine/delta st
 
 ### While executing
 
-Checked APIs return errors instead of asserting where the library has an explicit error path. Unchecked unit composition uses debug assertions for affine values. Convenience expression evaluation collapses many failures to null.
+Fallible APIs return errors instead of asserting where the library has an explicit error path. Unit composition rejects affine values through `UnitCompositionError`; Quantity unchecked variants still require caller-established preconditions. Expression evaluation preserves parse and runtime error categories.
 
 ### Return
 
@@ -44,7 +44,7 @@ The consumer either receives a value, an error union, null, or no executable at 
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Chooses rejection versus runtime checking. | Fixed by API call. |
-| Checked or unchecked operation | Chooses error return versus assertion/assumption. | Cannot change. |
+| Checked or unchecked operation | Unit composition is fallible; Quantity unchecked variants choose assumption over error return. | Cannot change. |
 | Dimension and quantity type | Fixes compile-time guarantees. | Types cannot change. |
 | Registry and format mode | Mostly runtime lookup/output concerns. | No effect on a compiled type. |
 | Affine or delta state | Determines runtime checked errors. | Current value state is fixed for the call. |
@@ -57,7 +57,7 @@ The consumer either receives a value, an error union, null, or no executable at 
 | Compile-time rejection | Build stops before execution. | No in-flight compile operation exists. |
 | Caller doing another operation | Caller revises source or chooses another API. | Current runtime call completes synchronously. |
 | Operation completes before extension | Type checks are immediate. | No partial executable result. |
-| Runtime error or panic | Caller can handle documented runtime errors. | Unchecked assertions may terminate. |
+| Runtime error or panic | Caller can handle documented runtime errors. | Only APIs with explicit unchecked preconditions can assume instead of returning. |
 | Allocator failure or resource teardown | Runtime allocation can fail. | Cleanup responsibility remains with caller. |
 | Input value/type/unit changing | New source/build is needed for type changes. | Values are captured by the current call. |
 | Second context or thread using same state | Typed values are independent; contexts isolate dynamic state. | Shared contexts require protection. |
@@ -86,12 +86,11 @@ The consumer either receives a value, an error union, null, or no executable at 
 
 - `fromDynamic` is the intended runtime counterpart to comptime `from`.
 - `div` can return an error even when its operand types are valid because delta state is runtime.
-- `evaluate` returning null does not identify whether parsing, evaluation, or allocation failed.
+- `evaluate` returns granular parse, runtime, and allocation errors.
 - Unchecked APIs are safe only when the caller has established their preconditions.
 
 ## Open questions and verification
 
-- Public documentation should make unchecked preconditions more prominent; this may be a product call.
-- A compile-failure fixture should be maintained to verify the intended diagnostics across Zig versions.
+- Public documentation should keep Quantity unchecked preconditions prominent.- A compile-failure fixture should be maintained to verify the intended diagnostics across Zig versions.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

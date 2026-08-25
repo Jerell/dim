@@ -60,7 +60,7 @@ Progress is tracked in the [coverage table](#coverage).
 - **Configuration.** Default story args: `unit="bar"`, `defaultValue="1 bar"`, conversions for `bar` labeled `bara` at three decimals, `kPa` at one decimal, and `psi` at two decimals. No custom props beyond each story's own args.
 - **Interaction shape.** The unit is a field lifecycle with phases arrive, leave untouched, begin editing, while editing, and finish editing. The interrupt list and cross-cutting order above are fixed for every feature document.
 - **Out of scope.** Standalone `DimProvider` configuration, custom WASM deployment, registry installation, application form submission, server persistence, mobile-specific behavior, and arbitrary consumer-defined props. Provider readiness is described only as it affects the component.
-- **Source.** `/Users/jerell/Repos/dim` at commit `c26ec6a` when this description was scaffolded.
+- **Source.** `/Users/jerell/Repos/dim` at revision commit `5d9cf0d`; this revision includes the provider readiness fix.
 - **Repository location.** This is a new description directory inside the source checkout, separate from the existing CLI description in `product-description/`.
 
 ## Structure
@@ -111,7 +111,7 @@ Status is one of `not started`, `drafted`, or `verified`.
 
 ## Reference
 
-The source of truth is `/Users/jerell/Repos/dim` at commit `c26ec6a`.
+The source of truth is `/Users/jerell/Repos/dim` at commit `5d9cf0d`.
 
 - `registry/components/quantity-input.tsx`: field value handling, state transitions, validation, conversions, popover content, styling, and callbacks.
 - `registry/components/dim-provider.tsx`: runtime loading and readiness visible to the component.

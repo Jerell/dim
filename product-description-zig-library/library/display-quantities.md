@@ -93,4 +93,4 @@ The caller receives a new `DisplayQuantity` and must deinit it. The original inp
 - Exact ownership behavior for every helper constructor should be checked with allocator instrumentation.
 - The display/value-space distinction needs a consumer-facing example in the public README.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

@@ -35,7 +35,7 @@ WASM processes each item in the current context. One item can fail while another
 
 ### Read and format
 
-The wrapper returns numbers only. It does not return per-item structured errors or formatted strings. Callers needing labels or diagnostics must issue individual calls or handle the thrown status text.
+The wrapper returns numbers only. It does not return per-item structured errors or formatted strings. Callers needing labels or diagnostics must issue individual calls or inspect the thrown `DimWasmError.status` from an individual call.
 
 ### Release or recover
 
@@ -96,4 +96,4 @@ The whole scratch allocation is reset after success or failure. A recovery inval
 - Maximum practical batch size and memory failure behavior need stress testing.
 - Per-item error reporting may be a product/API improvement.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

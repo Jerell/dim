@@ -105,4 +105,4 @@ Blur or moving focus elsewhere does not submit or reset the value. Dismissal of 
 - The exact focus-visible ring and border appearance depends on the Storybook theme and needs visual verification.
 - The component's missing input labels may be worth treating as a product bug, especially in Spreadsheet.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

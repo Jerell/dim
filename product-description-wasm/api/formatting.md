@@ -93,4 +93,4 @@ No FFI reset or runtime release is needed for pure formatting. A copied result r
 - Locale-sensitive formatting is not used; whether that is intentional needs product review.
 - Exact negative engineering exponent formatting needs boundary checks.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

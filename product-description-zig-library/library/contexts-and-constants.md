@@ -6,7 +6,7 @@ An explicit `DimContext` gives a consumer isolated runtime constants and scratch
 
 ## The simple case
 
-Initialize two contexts with the same allocator. Evaluate `foo = (2 m)` in the first, then evaluate `1 foo as m` there; it succeeds. The same expression in the second context returns null because constants do not leak across contexts. Deinitialize both contexts when finished.
+Initialize two contexts with the same allocator. Evaluate `foo = (2 m)` in the first, then evaluate `1 foo as m` there; it succeeds. The same expression in the second context returns `error.UndefinedVariable` because constants do not leak across contexts. Deinitialize both contexts when finished.
 
 ## The interaction, event by event
 
@@ -96,4 +96,4 @@ Lookup returns a `Unit` copy or null. Enumeration returns a `ConstantEntry` by i
 - Exact behavior of default-context lifetime at thread exit needs runtime verification.
 - Whether constant replacement should preserve or move listing order is a product/API decision.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

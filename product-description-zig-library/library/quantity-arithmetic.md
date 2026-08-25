@@ -48,7 +48,7 @@ The consumer receives a typed quantity and can read its value, compare its compi
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | `init` uses canonical values; `from` uses a comptime unit; `fromDynamic` checks a runtime unit. | The unit cannot change during a synchronous operation. |
-| Checked or unchecked operation | `div`/`divChecked` enforce runtime affine-delta safety; unchecked variants skip it. | The choice is fixed by the called method. |
+| Checked or unchecked operation | Quantity `div`/`divChecked` enforce runtime affine-delta safety; unchecked Quantity variants skip it. Unit composition is fallible by default. | The choice is fixed by the called method. |
 | Dimension and quantity type | The generic dimension fixes operand and result types. | Types cannot change at runtime. |
 | Registry and format mode | A registry and mode affect only formatting wrappers. | Formatting choices apply when a wrapper is created, not during arithmetic. |
 | Affine or delta state | `is_delta` is false for `init`/`from`; a delta can be constructed explicitly. | Runtime delta state can cause checked mul/div to return an error. |
@@ -61,7 +61,7 @@ The consumer receives a typed quantity and can read its value, compare its compi
 | Compile-time rejection | Compilation stops; no operation begins. | A type cannot change mid-operation. |
 | Caller doing another operation | The caller can choose another expression before calling. | The synchronous call finishes before another operation observes a result. |
 | Operation completes before extension | Construction and simple arithmetic return immediately with no partial state. | No separate completion interrupt exists. |
-| Runtime error or panic | A checked call can be selected to return an error. | A checked affine/delta violation returns an error; unchecked affine composition can assert. |
+| Runtime error or panic | A fallible call returns an error. | A checked affine/delta violation returns an error; unchecked Quantity variants assume preconditions. |
 | Allocator failure or resource teardown | No allocator is used by typed arithmetic. | No effect unless a later formatting/owned-result step runs. |
 | Input value/type/unit changing | The next call uses new values or a newly compiled type. | Current values are copied into the call; later changes do not alter the result. |
 | Second context or thread using same state | Typed values are independent of contexts. | Operations on independent values are independent. |
@@ -100,4 +100,4 @@ The consumer receives a typed quantity and can read its value, compare its compi
 - The library does not expose a user-facing unit label on a typed quantity; whether that is intuitive is a documentation question.
 - These behaviors were read from source and consumer tests; a hand-written external consumer should verify the public import path.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

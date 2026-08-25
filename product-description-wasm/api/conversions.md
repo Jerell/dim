@@ -95,4 +95,4 @@ The operation resets scratch memory. A recovery invalidates the context and remo
 - The caller-facing distinction between invalid input and false compatibility needs documentation review.
 - Browser behavior for URL-loaded conversion assets needs a harness.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

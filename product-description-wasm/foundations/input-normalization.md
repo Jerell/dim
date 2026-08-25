@@ -96,4 +96,4 @@ The temporary normalized bytes are reclaimed by FFI reset. The caller must retai
 - The complete set of Unicode syntax cases accepted by WASM needs browser/Node assertions beyond the current wrapper test.
 - Scientific expansion's 4096 bound is an implementation limit that should be documented or tested at its boundary.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

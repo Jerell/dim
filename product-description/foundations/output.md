@@ -103,4 +103,4 @@ An unrecognized format name after `as` falls back to `none` rather than producin
 - The final process status for parse and runtime errors was not confirmed by invoking the binary.
 - Terminal rendering of Unicode and behavior when stdout is closed were not confirmed by hand.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

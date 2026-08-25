@@ -29,7 +29,7 @@ The wrapper calls one exported operation with the context pointer and buffer poi
 
 ### Compute
 
-WASM writes output values and pointers into its FFI arena. The wrapper checks the operation status before reading output. A non-OK status becomes an error for operations that use `expectStatus`.
+WASM writes output values and pointers into its FFI arena. The wrapper checks the operation status before reading output. A non-OK status becomes a `DimWasmError` for operations that use `expectStatus`; its status code is available to callers before scratch memory is reset.
 
 ### Read and format
 
@@ -68,7 +68,7 @@ The `finally` block calls `dim_ffi_reset` for individual operations. The copied 
 
 **WASM memory and FFI reset.** This document owns copy/reset lifetime.
 
-**Errors and status codes.** Status is checked before reading fields.
+**Errors and status codes.** Status is checked before reading fields, and status-checked failures expose their numeric category through `DimWasmError.status`.
 
 **Contexts and constants.** Context pointers are passed with each operation.
 
@@ -94,4 +94,4 @@ The `finally` block calls `dim_ffi_reset` for individual operations. The copied 
 - Browser memory-growth and concurrent-call behavior need a dedicated harness.
 - The public wrapper does not expose a manual FFI reset; callers cannot control the scratch lifetime directly.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

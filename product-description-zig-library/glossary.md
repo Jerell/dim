@@ -70,7 +70,7 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Runtime error.** An error union result such as `DimensionMismatch`, `MulDivTemperatureDelta`, or `AffineUnitCombination` that the caller can handle.
 
-**Panic or assertion.** An unrecoverable failure path, including debug assertions in unchecked affine unit composition or a failed allocation that the caller does not handle.
+**Panic or assertion.** An unrecoverable failure path, including an unchecked Quantity precondition or a failed allocation that the caller does not handle. Unit affine composition returns an error instead of asserting.
 
 **Return.** The operation has produced a value or error and the caller regains control. A return does not imply that allocator-owned results have been deinitialized.
 

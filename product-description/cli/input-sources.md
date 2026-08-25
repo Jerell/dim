@@ -101,4 +101,4 @@ The direct source finishes after one expression. REPL and batch sources finish a
 - Exact prompt and EOF behavior needs a real TTY pass.
 - File read failures and whether later lines continue after a line-level runtime error need binary verification.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

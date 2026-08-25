@@ -103,4 +103,4 @@ The diagnostic is flushed with the current output handling. The exact process ex
 - Exit statuses for scanner, parser, runtime, and file-read failures remain unconfirmed.
 - Exact diagnostics for Unicode and malformed compound units need hand verification.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

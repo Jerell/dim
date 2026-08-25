@@ -12,7 +12,7 @@ These checklists compare the browser API documents with the TypeScript wrapper a
 
 1. From `/Users/jerell/Repos/dim`, run `npm run build:wasm`.
 2. Run `node tests/wasm_wrapper.test.mjs` for the Node wrapper pass.
-3. Confirm the source commit matches the feature footers (`811dcf0` for this draft snapshot).
+3. Confirm the source commit matches the feature footers (`5d9cf0d` for this revision).
 4. Use a minimal browser harness for URL loading, browser-relative asset paths, page teardown, and worker behavior.
 5. Record `pass`, `fail`, or `blocked`; do not mark browser documents verified from Node assertions alone.
 
@@ -30,4 +30,4 @@ The wrapper itself is the API surface. A script can inspect returned structured 
 
 ## Results so far
 
-A scripted pass ran on 2026-08-24: `npm run build:wasm` and `node tests/wasm_wrapper.test.mjs` passed and printed `27.77777777777778 m/s`. No browser harness has run, so no document is marked verified.
+An automated pass for this revision ran on 2026-08-25: `npm run build:wasm`, `node tests/wasm_wrapper.test.mjs`, `npm run test:components`, and `npm run typecheck` passed. The wrapper tests cover distinct parse and division-by-zero status errors. No browser harness has run, so no document is marked verified.

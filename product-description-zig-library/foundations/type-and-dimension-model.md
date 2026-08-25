@@ -57,7 +57,7 @@ The consumer receives a typed quantity or, for dynamic construction and checked 
 | Compile-time rejection | The program does not compile. | No type mutation is possible. |
 | Caller doing another operation | The caller can choose a different typed expression. | The current call returns synchronously. |
 | Operation completes before extension | Type construction and dimension calculation complete immediately. | No partial dimension is exposed. |
-| Runtime error or panic | Dynamic mismatch can return an error. | Checked delta violations return; unchecked affine operations may assert. |
+| Runtime error or panic | Dynamic mismatch can return an error. | Checked delta violations and Unit affine combinations return errors; Quantity unchecked variants retain their preconditions. |
 | Allocator failure or resource teardown | Dimension values do not allocate. | No effect. |
 | Input value/type/unit changing | A new type or unit is part of a later call/build. | Existing result is unaffected. |
 | Second context or thread using same state | Dimensions are immutable values. | Independent. |
@@ -94,4 +94,4 @@ The consumer receives a typed quantity or, for dynamic construction and checked 
 - Compiler diagnostics and error locations vary by Zig version and need external-consumer verification.
 - The practical limits of rational dimension overflow were not determined from user-facing tests.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

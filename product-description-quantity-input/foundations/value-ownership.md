@@ -102,4 +102,4 @@ The user cannot change ownership with a keyboard gesture. Ownership changes when
 - Switching a mounted field between controlled and uncontrolled ownership is not covered by tests and may be worth treating as a product/documentation question.
 - The exact callback ordering relative to React's visible update needs browser verification.
 
-Verified against /Users/jerell/Repos/dim commit `c26ec6a`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

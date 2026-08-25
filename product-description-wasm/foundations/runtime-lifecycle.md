@@ -34,7 +34,7 @@ The WASM instance and context become usable only after initialization resolves. 
 
 ### Read and format
 
-Readiness is observed through `subscribeDimReady`, while operations observe it indirectly through `requireRuntime`. There is no public status object; callers use the initialization promise or catch the not-initialized error.
+Readiness is observed through `subscribeDimReady`, while operations observe it indirectly through `requireRuntime`. Status-checked operations throw `DimWasmError`, whose numeric `status` distinguishes parse, runtime, and allocation failures; initialization still uses promises and readiness listeners.
 
 ### Release or recover
 
@@ -69,7 +69,7 @@ Readiness is observed through `subscribeDimReady`, while operations observe it i
 
 **WASM memory and FFI reset.** Memory becomes available after instance creation.
 
-**Errors and status codes.** Initialization errors reject promises; operation status errors throw.
+**Errors and status codes.** Initialization errors reject promises; operation status errors throw `DimWasmError` with distinct parse, runtime, and allocation status codes.
 
 **Contexts and constants.** A new context starts without previous constants.
 
@@ -95,4 +95,4 @@ Readiness is observed through `subscribeDimReady`, while operations observe it i
 - Exact event ordering for readiness listeners during recovery needs a browser/Node timing pass.
 - The intended concurrency contract for recovery while calls are active is not explicitly documented.
 
-Verified against /Users/jerell/Repos/dim commit `811dcf0`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

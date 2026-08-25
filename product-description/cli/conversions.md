@@ -101,4 +101,4 @@ A successful conversion prints one formatted line. `:scientific` and `:engineeri
 - Exact rendered degree and compound-unit text needs terminal verification.
 - The distinction between an undefined target and a dimension mismatch should be checked against actual stderr output.
 
-Verified against /Users/jerell/Repos/dim commit `c9c1957`.
+Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

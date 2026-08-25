@@ -58,7 +58,7 @@ The `verification/` directory contains one checklist for initialization, evaluat
 - **Interaction shape.** A browser API operation has phases prepare, invoke, compute, read and format, and release or recover. The modifier axis, interrupt rows, and cross-cutting order above are fixed.
 - **Out of scope.** The Zig library's direct API, native CLI, React provider/component, C ABI callers, server-side persistence, and application-specific UI.
 - **Run surface.** Build the artifact with `npm run build:wasm`; run wrapper assertions with `node tests/wasm_wrapper.test.mjs`; use a minimal browser harness for browser-only verification.
-- **Source.** `/Users/jerell/Repos/dim` at commit `811dcf0` when this description was scaffolded.
+- **Source.** `/Users/jerell/Repos/dim` at revision commit `5d9cf0d`; this revision updates the description after merged API fixes.
 - **Repository location.** This is a separate description directory inside the source checkout.
 
 ## Structure
@@ -113,7 +113,7 @@ Status is one of `not started`, `drafted`, or `verified`.
 
 ## Reference
 
-The source of truth is `/Users/jerell/Repos/dim` at commit `811dcf0`.
+The source of truth for this revision is `/Users/jerell/Repos/dim` at commit `5d9cf0d`.
 
 - `wasm/dim.ts`: initialization, asset lookup, WASI imports, memory marshalling, evaluation, conversions, constants, formatting, and recovery.
 - `src/wasm.zig`: exported context operations, structured result layouts, status codes, and batch behavior.

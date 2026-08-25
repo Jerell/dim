@@ -15,7 +15,6 @@ import {
   defineConst,
   initDim,
   recoverDim,
-  subscribeDimReady,
   type DimInitOptions,
 } from "@/lib/dim/dim";
 
@@ -51,6 +50,10 @@ export function DimProvider({
   errorFallback,
 }: DimProviderProps) {
   const optionsRef = useRef(initOptions);
+  const constantsRef = useRef(constants);
+  const constantsKey = JSON.stringify(constants);
+  const constantsKeyRef = useRef(constantsKey);
+  const appliedConstantsKeyRef = useRef<string | null>(null);
   const [state, setState] = useState<{
     status: DimContextValue["status"];
     error: Error | null;
@@ -58,26 +61,33 @@ export function DimProvider({
   const [retryKey, setRetryKey] = useState(0);
 
   optionsRef.current = initOptions;
+  constantsRef.current = constants;
+  constantsKeyRef.current = constantsKey;
 
-  useEffect(
-    () =>
-      subscribeDimReady((ready) => {
-        if (ready) {
-          setState({ status: "ready", error: null });
-        }
-      }),
-    [],
-  );
+  const applyConstants = () => {
+    for (const constant of constantsRef.current) {
+      defineConst(constant.name, constant.expr);
+    }
+    appliedConstantsKeyRef.current = constantsKeyRef.current;
+  };
 
   useEffect(() => {
     let active = true;
+    appliedConstantsKeyRef.current = null;
     setState({ status: "loading", error: null });
 
     const initialize = retryKey === 0 ? initDim : recoverDim;
     void initialize(optionsRef.current)
       .then(() => {
-        if (active) {
+        if (!active) return;
+        try {
+          // Do not expose ready until provider constants are available.
+          applyConstants();
           setState({ status: "ready", error: null });
+        } catch (cause) {
+          const error =
+            cause instanceof Error ? cause : new Error("Failed to define dim constants");
+          setState({ status: "error", error });
         }
       })
       .catch((cause: unknown) => {
@@ -92,14 +102,16 @@ export function DimProvider({
     };
   }, [retryKey]);
 
-  const constantsKey = JSON.stringify(constants);
   useEffect(() => {
-    if (state.status !== "ready") return;
+    if (
+      state.status !== "ready" ||
+      appliedConstantsKeyRef.current === constantsKey
+    ) {
+      return;
+    }
 
     try {
-      for (const constant of constants) {
-        defineConst(constant.name, constant.expr);
-      }
+      applyConstants();
     } catch (cause) {
       const error =
         cause instanceof Error ? cause : new Error("Failed to define dim constants");

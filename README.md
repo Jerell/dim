@@ -91,13 +91,11 @@ pub fn main() !void {
     _ = kmh;
     std.debug.print("speed: {d} km/h\n", .{safe_kmh.fromCanonicalValue(v.value, false)});
 
-    // evaluate string expressions
+    // evaluate string expressions; parse/runtime/allocation failures are typed
     const allocator = std.heap.page_allocator;
-    if (dim.evaluate(allocator, "100 km/h as m/s", null)) |result| {
-        var owned_result = result;
-        defer dim.deinitLiteralValue(allocator, &owned_result);
-        std.debug.print("result: {f}\n", .{owned_result.display_quantity});
-    }
+    var result = try dim.evaluate(allocator, "100 km/h as m/s", null);
+    defer dim.deinitLiteralValue(allocator, &result);
+    std.debug.print("result: {f}\n", .{result.display_quantity});
 }
 ```
 

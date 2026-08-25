@@ -6,10 +6,11 @@ const FormatMode = dim.Format.FormatMode;
 const ast_expr = @import("expressions.zig");
 const errors = @import("errors.zig");
 
-const ParseError = error{
+pub const ParseError = error{
     ExpectedToken,
     UnexpectedToken,
     ExpectedExpression,
+    InvalidToken,
     OutOfMemory,
 };
 
@@ -33,15 +34,20 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parse(self: *Parser) ?*ast_expr.Expr {
-        const expr = self.conversion() catch |err| {
+    /// Parse an expression while preserving allocation and syntax failures.
+    /// Callers that only need an optional AST can use `parse`.
+    pub fn parseDetailed(self: *Parser) ParseError!*ast_expr.Expr {
+        return self.conversion() catch |err| {
             self.hadError = true;
             if (self.err_writer) |w| {
                 w.print("Parse error: {any}\n", .{err}) catch {};
             }
-            return null;
+            return err;
         };
-        return expr;
+    }
+
+    pub fn parse(self: *Parser) ?*ast_expr.Expr {
+        return self.parseDetailed() catch null;
     }
 
     fn conversion(self: *Parser) ParseError!*ast_expr.Expr {

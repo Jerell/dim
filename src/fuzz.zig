@@ -29,10 +29,9 @@ const fuzz_corpus = [_][]const u8{
 };
 
 fn evaluateAndRelease(context: *dim.DimContext, input: []const u8) void {
-    if (dim.evaluateWithContext(context, std.testing.allocator, input, null)) |value| {
-        var owned = value;
-        dim.deinitLiteralValue(std.testing.allocator, &owned);
-    }
+    const value = dim.evaluateWithContext(context, std.testing.allocator, input, null) catch return;
+    var owned = value;
+    dim.deinitLiteralValue(std.testing.allocator, &owned);
 }
 
 fn fuzzDimInput(_: void, smith: *std.testing.Smith) !void {

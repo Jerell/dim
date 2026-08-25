@@ -124,7 +124,40 @@ type DimRuntime = DimExports & {
 const EVAL_RESULT_SIZE = 104;
 const QUANTITY_RESULT_SIZE = 80;
 const DIM_SLICE_SIZE = 8;
-const STATUS_OK = 0;
+
+export const DIM_STATUS = {
+  ok: 0,
+  evalError: 1,
+  invalidArgument: 2,
+  wrongKind: 3,
+  outOfMemory: 4,
+  parseError: 5,
+  invalidOperands: 6,
+  invalidOperand: 7,
+  divisionByZero: 8,
+  unsupportedOperator: 9,
+  undefinedVariable: 10,
+  nonRationalDimensionalExponent: 11,
+  affineUnitExponentiation: 12,
+  dimensionOverflow: 13,
+  mulDivTemperatureDelta: 14,
+} as const;
+
+export type DimStatusCode = (typeof DIM_STATUS)[keyof typeof DIM_STATUS];
+
+export class DimWasmError extends Error {
+  readonly operation: string;
+  readonly status: DimStatusCode;
+
+  constructor(operation: string, status: DimStatusCode) {
+    super(`${operation} failed with status ${status}`);
+    this.name = "DimWasmError";
+    this.operation = operation;
+    this.status = status;
+  }
+}
+
+const STATUS_OK = DIM_STATUS.ok;
 const KIND_NUMBER = 0;
 const KIND_BOOLEAN = 1;
 const KIND_STRING = 2;
@@ -585,7 +618,7 @@ function readDimensions(dv: DataView, offset: number): DimDimension {
 
 function expectStatus(rc: number, label: string) {
   if (rc !== STATUS_OK) {
-    throw new Error(`${label} failed with status ${rc}`);
+    throw new DimWasmError(label, rc as DimStatusCode);
   }
 }
 

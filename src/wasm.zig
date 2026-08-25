@@ -29,6 +29,16 @@ pub const DimStatus = enum(i32) {
     invalid_argument = 2,
     wrong_kind = 3,
     out_of_memory = 4,
+    parse_error = 5,
+    invalid_operands = 6,
+    invalid_operand = 7,
+    division_by_zero = 8,
+    unsupported_operator = 9,
+    undefined_variable = 10,
+    non_rational_dimensional_exponent = 11,
+    affine_unit_exponentiation = 12,
+    dimension_overflow = 13,
+    mul_div_temperature_delta = 14,
 };
 
 pub const DimValueKind = enum(u32) {
@@ -117,8 +127,28 @@ fn ensureContext(ctx: ?*dim.DimContext) ?*dim.DimContext {
     return ctx;
 }
 
-fn evaluateOwned(ctx: *dim.DimContext, input: []const u8) !dim.LiteralValue {
-    return dim.evaluateWithContext(ctx, ffiAllocator(), input, null) orelse error.EvalError;
+fn evaluationStatus(err: dim.EvaluationError) DimStatus {
+    return switch (err) {
+        error.OutOfMemory => .out_of_memory,
+        error.ExpectedToken,
+        error.UnexpectedToken,
+        error.ExpectedExpression,
+        error.InvalidToken,
+        => .parse_error,
+        error.InvalidOperands => .invalid_operands,
+        error.InvalidOperand => .invalid_operand,
+        error.DivisionByZero => .division_by_zero,
+        error.UnsupportedOperator => .unsupported_operator,
+        error.UndefinedVariable => .undefined_variable,
+        error.NonRationalDimensionalExponent => .non_rational_dimensional_exponent,
+        error.AffineUnitExponentiation => .affine_unit_exponentiation,
+        error.DimensionOverflow => .dimension_overflow,
+        error.MulDivTemperatureDelta => .mul_div_temperature_delta,
+    };
+}
+
+fn evaluateOwned(ctx: *dim.DimContext, input: []const u8) dim.EvaluationError!dim.LiteralValue {
+    return dim.evaluateWithContext(ctx, ffiAllocator(), input, null);
 }
 
 fn literalDimension(value: dim.LiteralValue) ?dim.Dimension {
@@ -262,7 +292,7 @@ pub export fn dim_ctx_define(
         return statusCode(.out_of_memory);
     };
 
-    _ = evaluateOwned(actual, assignment_src) catch return statusCode(.eval_error);
+    _ = evaluateOwned(actual, assignment_src) catch |err| return statusCode(evaluationStatus(err));
     return statusCode(.ok);
 }
 
@@ -284,9 +314,9 @@ pub export fn dim_ctx_eval(
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
     const input = input_ptr[0..input_len];
-    const value = evaluateOwned(actual, input) catch {
+    const value = evaluateOwned(actual, input) catch |err| {
         out_result.* = std.mem.zeroes(DimEvalResult);
-        return statusCode(.eval_error);
+        return statusCode(evaluationStatus(err));
     };
     fillEvalResult(out_result, value);
     return statusCode(.ok);
@@ -308,9 +338,9 @@ pub export fn dim_ctx_convert_expr(
         return statusCode(.out_of_memory);
     };
 
-    const value = evaluateOwned(actual, source) catch {
+    const value = evaluateOwned(actual, source) catch |err| {
         out_result.* = std.mem.zeroes(DimQuantityResult);
-        return statusCode(.eval_error);
+        return statusCode(evaluationStatus(err));
     };
     switch (value) {
         .display_quantity => |dq| {
@@ -341,7 +371,7 @@ pub export fn dim_ctx_convert_value(
         to_ptr[0..to_len],
     ) catch return statusCode(.out_of_memory);
 
-    const result = evaluateOwned(actual, source) catch return statusCode(.eval_error);
+    const result = evaluateOwned(actual, source) catch |err| return statusCode(evaluationStatus(err));
 
     switch (result) {
         .display_quantity => |dq| {
@@ -361,11 +391,11 @@ pub export fn dim_ctx_is_compatible(
     out_bool: *u32,
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
-    const expr_value = evaluateOwned(actual, expr_ptr[0..expr_len]) catch return statusCode(.eval_error);
+    const expr_value = evaluateOwned(actual, expr_ptr[0..expr_len]) catch |err| return statusCode(evaluationStatus(err));
 
     const unit_expr = buildUnitExpression(ffiAllocator(), unit_ptr[0..unit_len]) catch return statusCode(.out_of_memory);
 
-    const unit_value = evaluateOwned(actual, unit_expr) catch return statusCode(.eval_error);
+    const unit_value = evaluateOwned(actual, unit_expr) catch |err| return statusCode(evaluationStatus(err));
 
     const expr_dim = literalDimension(expr_value) orelse return statusCode(.wrong_kind);
     const unit_dim = literalDimension(unit_value) orelse return statusCode(.wrong_kind);
@@ -382,8 +412,8 @@ pub export fn dim_ctx_same_dimension(
     out_bool: *u32,
 ) i32 {
     const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
-    const lhs_value = evaluateOwned(actual, lhs_ptr[0..lhs_len]) catch return statusCode(.eval_error);
-    const rhs_value = evaluateOwned(actual, rhs_ptr[0..rhs_len]) catch return statusCode(.eval_error);
+    const lhs_value = evaluateOwned(actual, lhs_ptr[0..lhs_len]) catch |err| return statusCode(evaluationStatus(err));
+    const rhs_value = evaluateOwned(actual, rhs_ptr[0..rhs_len]) catch |err| return statusCode(evaluationStatus(err));
 
     const lhs_dim = literalDimension(lhs_value) orelse return statusCode(.wrong_kind);
     const rhs_dim = literalDimension(rhs_value) orelse return statusCode(.wrong_kind);

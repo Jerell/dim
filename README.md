@@ -99,6 +99,18 @@ pub fn main() !void {
 `error.MulDivTemperatureDelta`. Use `mulUnchecked` or `divUnchecked` only when
 the caller has already established that both operands are multiplicative.
 
+Unit composition is fallible in the 0.3 API: `Unit.mul`, `Unit.div`, `Unit.pow`,
+and `Unit.powRational` return `UnitCompositionError!Unit` and report
+`error.AffineUnitCombination` for affine units. Handle the error with `try` in a
+function or `catch unreachable` for a compile-time/container-level declaration:
+
+```zig
+const kmh = dim.Units.si.km.div(dim.Units.si.h, "km/h") catch unreachable;
+```
+
+This is a breaking change from 0.2: Unit composition no longer asserts in debug
+builds, and the old `*Checked` Unit aliases are removed.
+
 ### CLI
 
 Usage:

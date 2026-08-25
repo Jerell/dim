@@ -1,6 +1,8 @@
 const std = @import("std");
 const dim = @import("dim");
 
+const ContainerKmH = dim.Units.si.km.div(dim.Units.si.h, "km/h") catch unreachable;
+
 test "documented comptime unit namespace and typed arithmetic compile" {
     const Si = dim.Units.si;
     const Length = dim.Quantity(dim.Dimensions.Length);
@@ -22,6 +24,7 @@ test "README formatting and evaluation surface compiles" {
     const elapsed = Time.from(1.0, Si.h);
     const speed = try distance.div(elapsed);
     const kmh = try Si.km.div(Si.h, "km/h");
+    _ = ContainerKmH;
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -32,7 +35,10 @@ test "README formatting and evaluation surface compiles" {
     defer dim.deinitLiteralValue(std.testing.allocator, &result);
 
     try std.testing.expectApproxEqAbs(100.0, speed.asUnit(kmh, .none).q.value / kmh.scale, 1e-9);
-    try std.testing.expectApproxEqAbs(100.0, speed.asUnit(kmh, .none).q.value / kmh.scale, 1e-9);
+    try std.testing.expectError(
+        error.AffineUnitCombination,
+        Si.C.div(Si.h, "C/h"),
+    );
 }
 
 test "temperature delta checks are runtime-safe and scalar operations preserve state" {

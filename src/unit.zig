@@ -57,7 +57,7 @@ pub const Unit = struct {
         };
     }
 
-    pub fn powInt(self: Unit, exponent: i32, symbol: []const u8) UnitCompositionError!Unit {
+    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) UnitCompositionError!Unit {
         if (self.isAffine()) return error.AffineUnitCombination;
         return .{
             .dim = Dimension.mulByInt(self.dim, exponent),
@@ -73,10 +73,6 @@ pub const Unit = struct {
             .scale = std.math.pow(f64, self.scale, exponent.toF64()),
             .symbol = symbol,
         };
-    }
-
-    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) UnitCompositionError!Unit {
-        return self.powInt(exponent, symbol);
     }
 
     pub fn div(self: Unit, other: Unit, symbol: []const u8) UnitCompositionError!Unit {

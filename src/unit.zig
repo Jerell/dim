@@ -4,6 +4,8 @@ const Rational = @import("rational.zig").Rational;
 const Quantity = @import("quantity.zig").Quantity;
 const DisplayQuantity = @import("runtime.zig").DisplayQuantity;
 
+pub const UnitCompositionError = error{AffineUnitCombination};
+
 pub const Unit = struct {
     dim: Dimension,
     scale: f64,
@@ -44,8 +46,10 @@ pub const Unit = struct {
         return self.fromCanonicalValue(q.value, q.is_delta);
     }
 
-    pub fn mul(self: Unit, other: Unit, symbol: []const u8) Unit {
-        std.debug.assert(!self.isAffine() and !other.isAffine());
+    /// Compose two multiplicative units. Affine units are rejected rather than
+    /// triggering a debug assertion, so callers can handle the failure safely.
+    pub fn mul(self: Unit, other: Unit, symbol: []const u8) UnitCompositionError!Unit {
+        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
         return .{
             .dim = Dimension.add(self.dim, other.dim),
             .scale = self.scale * other.scale,
@@ -53,13 +57,8 @@ pub const Unit = struct {
         };
     }
 
-    pub fn mulChecked(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
-        return self.mul(other, symbol);
-    }
-
-    pub fn powInt(self: Unit, exponent: i32, symbol: []const u8) Unit {
-        std.debug.assert(!self.isAffine());
+    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) UnitCompositionError!Unit {
+        if (self.isAffine()) return error.AffineUnitCombination;
         return .{
             .dim = Dimension.mulByInt(self.dim, exponent),
             .scale = std.math.pow(f64, self.scale, @floatFromInt(exponent)),
@@ -67,8 +66,8 @@ pub const Unit = struct {
         };
     }
 
-    pub fn powRational(self: Unit, exponent: Rational, symbol: []const u8) Unit {
-        std.debug.assert(!self.isAffine());
+    pub fn powRational(self: Unit, exponent: Rational, symbol: []const u8) UnitCompositionError!Unit {
+        if (self.isAffine()) return error.AffineUnitCombination;
         return .{
             .dim = Dimension.mulByRational(self.dim, exponent),
             .scale = std.math.pow(f64, self.scale, exponent.toF64()),
@@ -76,32 +75,13 @@ pub const Unit = struct {
         };
     }
 
-    pub fn pow(self: Unit, exponent: i32, symbol: []const u8) Unit {
-        return self.powInt(exponent, symbol);
-    }
-
-    pub fn powChecked(self: Unit, exponent: i32, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.isAffine()) return error.AffineUnitCombination;
-        return self.powInt(exponent, symbol);
-    }
-
-    pub fn powRationalChecked(self: Unit, exponent: Rational, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.isAffine()) return error.AffineUnitCombination;
-        return self.powRational(exponent, symbol);
-    }
-
-    pub fn div(self: Unit, other: Unit, symbol: []const u8) Unit {
-        std.debug.assert(!self.isAffine() and !other.isAffine());
+    pub fn div(self: Unit, other: Unit, symbol: []const u8) UnitCompositionError!Unit {
+        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
         return .{
             .dim = Dimension.sub(self.dim, other.dim),
             .scale = self.scale / other.scale,
             .symbol = symbol,
         };
-    }
-
-    pub fn divChecked(self: Unit, other: Unit, symbol: []const u8) error{AffineUnitCombination}!Unit {
-        if (self.isAffine() or other.isAffine()) return error.AffineUnitCombination;
-        return self.div(other, symbol);
     }
 };
 

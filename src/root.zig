@@ -6,6 +6,7 @@ pub const Quantity = @import("quantity.zig").Quantity;
 pub const QuantityError = @import("quantity.zig").QuantityError;
 pub const Dimensions = @import("dimension.zig").Dimensions;
 pub const Unit = @import("unit.zig").Unit;
+pub const UnitCompositionError = @import("unit.zig").UnitCompositionError;
 pub const Alias = @import("unit.zig").Alias;
 pub const Prefix = @import("unit.zig").Prefix;
 pub const UnitRegistry = @import("unit.zig").UnitRegistry;
@@ -332,13 +333,13 @@ test "force = mass * acceleration" {
     try std.testing.expectApproxEqAbs(19.62, f.value, 1e-9);
 }
 
-test "unit composition supports unchecked and checked affine handling" {
-    const kmh = _si.km.div(_si.h, "km/h");
+test "unit composition rejects affine combinations without assertions" {
+    const kmh = try _si.km.div(_si.h, "km/h");
     try std.testing.expect(Dimension.eql(kmh.dim, Dimensions.Velocity));
     try std.testing.expectApproxEqAbs(1000.0 / 3600.0, kmh.scale, 1e-12);
 
-    try std.testing.expectError(error.AffineUnitCombination, _si.C.divChecked(_si.h, "C/h"));
-    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powChecked(2, "F^2"));
+    try std.testing.expectError(error.AffineUnitCombination, _si.C.div(_si.h, "C/h"));
+    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.pow(2, "F^2"));
 }
 
 test "rational normalization and quantity power helpers" {
@@ -361,11 +362,11 @@ test "rational normalization and quantity power helpers" {
 }
 
 test "unit powRational preserves exact dimensions and rejects affine units" {
-    const sqrt_meter = _si.m.powRational(Rational.init(1, 2), "m^(1/2)");
+    const sqrt_meter = try _si.m.powRational(Rational.init(1, 2), "m^(1/2)");
     try std.testing.expect(Dimension.eql(sqrt_meter.dim, Dimension.mulByRational(Dimensions.Length, Rational.init(1, 2))));
     try std.testing.expectApproxEqAbs(1.0, sqrt_meter.scale, 1e-12);
 
-    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powRationalChecked(Rational.init(1, 2), "F^(1/2)"));
+    try std.testing.expectError(error.AffineUnitCombination, _imperial.F.powRational(Rational.init(1, 2), "F^(1/2)"));
 }
 
 test "temperature: abs + delta -> abs" {

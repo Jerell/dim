@@ -522,3 +522,44 @@ test "unit lookup handles aliases and rejects prefixed affine units" {
 
     try std.testing.expect(findUnitAll("mC") == null);
 }
+
+test "volume units cover litres and both gallons" {
+    const litre = findUnitAll("L") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(Dimension.eql(litre.dim, Dimensions.Volume));
+    try std.testing.expectApproxEqAbs(1e-3, litre.scale, 1e-18);
+
+    // The litre lives in the SI registry so that it takes the SI prefixes.
+    const millilitre = findUnitAll("mL") orelse return error.TestUnexpectedResult;
+    try std.testing.expectApproxEqAbs(1e-6, millilitre.scale, 1e-18);
+
+    // A bare `gal` is the US liquid gallon. The imperial gallon is 20% larger,
+    // so the two must never resolve to the same unit.
+    const us = findUnitAll("gal") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(Dimension.eql(us.dim, Dimensions.Volume));
+    try std.testing.expectApproxEqAbs(3.785411784e-3, us.scale, 1e-15);
+
+    const alias = findUnitAll("galUS") orelse return error.TestUnexpectedResult;
+    try std.testing.expectApproxEqAbs(us.scale, alias.scale, 1e-15);
+
+    const uk = findUnitAll("galUK") orelse return error.TestUnexpectedResult;
+    try std.testing.expectApproxEqAbs(4.54609e-3, uk.scale, 1e-15);
+    try std.testing.expect(uk.scale != us.scale);
+}
+
+test "a US flow coefficient converts to its metric counterpart" {
+    // Cv (US gal/min at 1 psi) and Kv (m³/h at 1 bar) are one quantity in two
+    // units: 3.785411784e-3 m³ x 60 / sqrt(6894.757 / 1e5) = 0.86498. Anything
+    // that reports 1.0 here has silently dropped the unit conversion, and
+    // anything near 1.039 has resolved `gal` to the imperial gallon.
+    var result = try evaluate(
+        std.testing.allocator,
+        "1 gal/min/psi^(1/2) as m^3/h/bar^(1/2)",
+        null,
+    );
+    defer deinitLiteralValue(std.testing.allocator, &result);
+
+    switch (result) {
+        .display_quantity => |dq| try std.testing.expectApproxEqAbs(0.8649776738, dq.value, 1e-9),
+        else => return error.TestUnexpectedResult,
+    }
+}

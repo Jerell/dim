@@ -7,6 +7,10 @@ pub const mm = dim.Unit{ .dim = dim.Dimensions.Length, .scale = 0.001, .symbol =
 
 pub const m2 = dim.Unit{ .dim = dim.Dimensions.Area, .scale = 1.0, .symbol = "m²" };
 pub const m3 = dim.Unit{ .dim = dim.Dimensions.Volume, .scale = 1.0, .symbol = "m³" };
+/// The litre is not an SI unit, but SI accepts it for use alongside SI and it
+/// takes the SI prefixes, so it belongs to this registry rather than a
+/// customary one. Exactly 1e-3 m³.
+pub const L = dim.Unit{ .dim = dim.Dimensions.Volume, .scale = 1e-3, .symbol = "L" };
 
 pub const g = dim.Unit{ .dim = dim.Dimensions.Mass, .scale = 0.001, .symbol = "g" };
 pub const kg = dim.Unit{ .dim = dim.Dimensions.Mass, .scale = 1.0, .symbol = "kg" };
@@ -49,12 +53,15 @@ pub const Units = [_]dim.Unit{
     atm,  bar, bara, barg,
     J,    W,   N,    mps,
     mps2, m2,  m3,   kgps,
-    Cp,
+    Cp,   L,
 };
 
 const aliases = [_]dim.Alias{
     .{ .symbol = "m2", .target = &m2 },
     .{ .symbol = "m3", .target = &m3 },
+    .{ .symbol = "l", .target = &L },
+    .{ .symbol = "litre", .target = &L },
+    .{ .symbol = "liter", .target = &L },
     .{ .symbol = "Newton", .target = &N },
     .{ .symbol = "sec", .target = &s },
     .{ .symbol = "m/s2", .target = &mps2 },

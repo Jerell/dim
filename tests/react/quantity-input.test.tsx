@@ -76,7 +76,7 @@ describe("QuantityInput", () => {
     expect(screen.getByText("Not compatible with bar")).toBeVisible();
   });
 
-  test("a dimensionless field accepts bare fractions, percent and ppm", async () => {
+  test("a dimensionless field accepts bare fractions, % and ppm", async () => {
     const user = userEvent.setup();
     const onResultChange = vi.fn();
     renderQuantityInput({
@@ -91,6 +91,8 @@ describe("QuantityInput", () => {
       ["0.0005", 5e-4],
       ["500 ppm", 5e-4],
       ["0.05 percent", 5e-4],
+      ["0.05 %", 5e-4],
+      ["0.05%", 5e-4],
     ] as const) {
       await user.clear(input);
       await user.type(input, text);

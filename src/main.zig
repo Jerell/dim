@@ -312,6 +312,11 @@ test "fractions convert through the dimensionless unit 1, percent, ppm and ppb" 
     // A plain number is dimensionless, so it converts too.
     try expectFormatted(allocator, "0.5 as 1", "0.5");
     try expectFormatted(allocator, "0.5 as percent", "50 percent");
+    // `%` is the percent, with or without a space.
+    try expectFormatted(allocator, "5 % as 1", "0.05");
+    try expectFormatted(allocator, "5% as ppm", "50000 ppm");
+    try expectFormatted(allocator, "0.05 as %", "5 %");
+    try expectFormatted(allocator, "12.5 %", "12.5 %");
     // A unit with a scale that is not exact in binary still displays cleanly.
     try expectFormatted(allocator, "500 ppm", "500 ppm");
     // A dimensioned quantity is not a fraction.

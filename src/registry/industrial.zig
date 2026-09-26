@@ -22,6 +22,7 @@ pub const Units = [_]dim.Unit{ MTPA, one, percent, ppm, ppb };
 
 const aliases = [_]dim.Alias{
     .{ .symbol = "mtpa", .target = &MTPA },
+    .{ .symbol = "%", .target = &percent },
 };
 
 const prefixes = [_]dim.Prefix{};

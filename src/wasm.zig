@@ -235,6 +235,9 @@ fn buildConvertValueExpression(
 }
 
 fn buildUnitExpression(allocator: std.mem.Allocator, unit: []const u8) ![]u8 {
+    // "1 1" is not an expression; the dimensionless unit is the number 1.
+    if (std.mem.eql(u8, std.mem.trim(u8, unit, " "), "1"))
+        return std.fmt.allocPrint(allocator, "1", .{});
     return std.fmt.allocPrint(allocator, "1 {s}", .{unit});
 }
 

@@ -14,6 +14,19 @@ pub const ValueSpace = enum {
     display,
 };
 
+/// Rounds a value to 15 significant digits for display. Values are stored
+/// canonically, so a unit whose scale is not exact in binary shows round-trip
+/// noise: 500 ppm is 500 * 1e-6 / 1e-6 = 500.00000000000006. Fifteen digits is
+/// the precision every double carries, so no real digit is lost.
+pub fn displayRounded(value: f64) f64 {
+    if (value == 0 or !std.math.isFinite(value)) return value;
+    const magnitude = @floor(std.math.log10(@abs(value)));
+    const factor = std.math.pow(f64, 10, 14 - magnitude);
+    if (!std.math.isFinite(factor) or factor == 0) return value;
+    const rounded = @round(value * factor) / factor;
+    return if (std.math.isFinite(rounded)) rounded else value;
+}
+
 pub const DisplayQuantity = struct {
     value: f64,
     dim: Dimension,
@@ -27,7 +40,7 @@ pub const DisplayQuantity = struct {
     value_space: ValueSpace = .canonical,
 
     pub fn format(self: DisplayQuantity, writer: *std.Io.Writer) !void {
-        const display_value = self.valueForCurrentUnit();
+        const display_value = displayRounded(self.valueForCurrentUnit());
         const delta_prefix: []const u8 = if (self.is_delta) "Δ" else "";
         const show_unit = !self.dim.isDimensionless() or !std.mem.eql(u8, self.unit, "1");
         switch (self.mode) {

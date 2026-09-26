@@ -410,6 +410,19 @@ pub const Parser = struct {
     }
 
     fn parseUnitFactor(self: *Parser) ParseError!*ast_expr.Expr {
+        // `1` names the dimensionless unit, as dim writes a dimensionless
+        // result, so "0.5 as 1" and "500 ppm as 1" convert to a fraction.
+        if (self.check(TokenType.Number) and std.mem.eql(u8, self.peek().lexeme, "1")) {
+            _ = self.advance();
+            const node_ptr = try self.allocator.create(ast_expr.Expr);
+            node_ptr.* = ast_expr.Expr{
+                .unit_expr = ast_expr.UnitExpr{
+                    .name = "1",
+                    .exponent = dim.Rational.fromInt(1),
+                },
+            };
+            return node_ptr;
+        }
         if (self.match(&.{TokenType.LParen})) {
             // Parse a grouped unit expression and return it directly (no Grouping node),
             // so unit string rendering remains consistent.

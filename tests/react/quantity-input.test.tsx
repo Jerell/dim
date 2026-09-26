@@ -76,6 +76,38 @@ describe("QuantityInput", () => {
     expect(screen.getByText("Not compatible with bar")).toBeVisible();
   });
 
+  test("a dimensionless field accepts bare fractions, percent and ppm", async () => {
+    const user = userEvent.setup();
+    const onResultChange = vi.fn();
+    renderQuantityInput({
+      "aria-label": "Water content",
+      unit: "1",
+      conversions: [{ unit: "1", label: "Fraction" }],
+      onResultChange,
+    });
+
+    const input = await screen.findByRole("textbox", { name: "Water content" });
+    for (const [text, fraction] of [
+      ["0.0005", 5e-4],
+      ["500 ppm", 5e-4],
+      ["0.05 percent", 5e-4],
+    ] as const) {
+      await user.clear(input);
+      await user.type(input, text);
+      await waitFor(() =>
+        expect(onResultChange).toHaveBeenLastCalledWith(
+          expect.objectContaining({ status: "valid", expression: text }),
+        ),
+      );
+      expect(input).not.toHaveAttribute("aria-invalid");
+      const conversion = onResultChange.mock.lastCall?.[0].conversions[0];
+      expect(conversion.value).toBeCloseTo(fraction, 12);
+    }
+    await user.clear(input);
+    await user.type(input, "3 m");
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+  });
+
   test("emits raw controlled values", async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();

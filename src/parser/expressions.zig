@@ -371,9 +371,17 @@ pub const Display = struct {
         context: ?*dim.DimContext,
     ) RuntimeError!LiteralValue {
         const val = try self.expr.evaluateInContext(allocator, context);
-        if (val != .display_quantity) return RuntimeError.InvalidOperand;
-
-        const dq = val.display_quantity;
+        // A plain number is a dimensionless quantity, so "0.5 as 1" and
+        // "0.5 as percent" convert it.
+        const dq: DisplayQuantity = switch (val) {
+            .display_quantity => |quantity| quantity,
+            .number => |number| DisplayQuantity{
+                .value = number,
+                .dim = dim.Dimensions.Dimensionless,
+                .unit = "1",
+            },
+            else => return RuntimeError.InvalidOperand,
+        };
 
         // Evaluate the unit expression to a DisplayQuantity representing the target unit
         const unit_val = try self.unit_expr.evaluateInContext(allocator, context);

@@ -64,10 +64,15 @@ export type QuantityInputProps = Omit<
   onResultChange?: (state: QuantityInputState) => void;
 };
 
+/**
+ * A bare number is read in the field's unit. The dimensionless unit is `1`,
+ * and a bare number already is dimensionless: "0.5 1" is not an expression.
+ */
 function toExpression(value: string, unit: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
-  return Number.isFinite(Number(trimmed)) ? `${trimmed} ${unit}` : trimmed;
+  if (!Number.isFinite(Number(trimmed)) || unit.trim() === "1") return trimmed;
+  return `${trimmed} ${unit}`;
 }
 
 function formatConversionValue(

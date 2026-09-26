@@ -8,7 +8,17 @@ pub const MTPA = dim.Unit{
     .symbol = "MTPA",
 };
 
-pub const Units = [_]dim.Unit{MTPA};
+/// The dimensionless unit, written as dim writes a dimensionless result, so a
+/// conversion target of `1` ("500 ppm as 1") gives a plain fraction.
+pub const one = dim.Unit{ .dim = dim.Dimensions.Dimensionless, .scale = 1.0, .symbol = "1" };
+
+/// Dimensionless fractions as engineers state composition limits, such as
+/// water in CO₂ at 500 ppm. Mole or mass basis is the caller's to record.
+pub const percent = dim.Unit{ .dim = dim.Dimensions.Dimensionless, .scale = 1e-2, .symbol = "percent" };
+pub const ppm = dim.Unit{ .dim = dim.Dimensions.Dimensionless, .scale = 1e-6, .symbol = "ppm" };
+pub const ppb = dim.Unit{ .dim = dim.Dimensions.Dimensionless, .scale = 1e-9, .symbol = "ppb" };
+
+pub const Units = [_]dim.Unit{ MTPA, one, percent, ppm, ppb };
 
 const aliases = [_]dim.Alias{
     .{ .symbol = "mtpa", .target = &MTPA },

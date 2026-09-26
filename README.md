@@ -42,6 +42,7 @@ $ dim "1 bar as kPa"
   - Support arithmetic (`+`, `-`, `*`, `/`).
   - Support derived units (`m/s`, `N`, `J`).
   - `as <unit-or-constant>` to force output in a specific unit or user-defined constant; supports compound expressions after `as` (e.g., `kg/d`).
+  - Dimensionless fractions: `500 ppm`, `5 %` (or `5%`, `5 percent`), `2 ppb`, and `as 1` for a plain fraction (`500 ppm as 1` → `0.0005`). A plain number converts too (`0.5 as %`).
   - REPL mode for interactive calculations.
   - Configurable formatting (`:scientific`, `:engineering`, `:auto`, `:none`).
   - Runtime constants: define with `name = (Expr)`. Constants behave like units and take precedence over registries. Commands: `list`, `show <name>`, `clear <name>`, `clear all`.

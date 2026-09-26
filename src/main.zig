@@ -287,6 +287,42 @@ test "dimensionless quotient does not print pseudo-unit" {
     }
 }
 
+fn expectFormatted(allocator: std.mem.Allocator, expr: []const u8, expected: []const u8) !void {
+    const result = try evalTestExpr(allocator, expr);
+    switch (result) {
+        .display_quantity => |dq| {
+            var aw: std.Io.Writer.Allocating = .init(allocator);
+            defer aw.deinit();
+            try dq.format(&aw.writer);
+            try std.testing.expectEqualStrings(expected, aw.written());
+        },
+        else => std.debug.panic("expected display_quantity result for {s}", .{expr}),
+    }
+}
+
+test "fractions convert through the dimensionless unit 1, percent, ppm and ppb" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    try expectFormatted(allocator, "500 ppm as 1", "0.0005");
+    try expectFormatted(allocator, "5 percent as 1", "0.05");
+    try expectFormatted(allocator, "2 ppb as ppm", "0.002 ppm");
+    try expectFormatted(allocator, "0.0005 mol/mol as ppm", "500 ppm");
+    // A plain number is dimensionless, so it converts too.
+    try expectFormatted(allocator, "0.5 as 1", "0.5");
+    try expectFormatted(allocator, "0.5 as percent", "50 percent");
+    // `%` is the percent, with or without a space.
+    try expectFormatted(allocator, "5 % as 1", "0.05");
+    try expectFormatted(allocator, "5% as ppm", "50000 ppm");
+    try expectFormatted(allocator, "0.05 as %", "5 %");
+    try expectFormatted(allocator, "12.5 %", "12.5 %");
+    // A unit with a scale that is not exact in binary still displays cleanly.
+    try expectFormatted(allocator, "500 ppm", "500 ppm");
+    // A dimensioned quantity is not a fraction.
+    try std.testing.expectError(error.InvalidOperands, evalTestExpr(allocator, "3 m as 1"));
+}
+
 test "middle dot works inside unit expressions after 'as' (J/kg·K)" {
     const err_writer: ?*std.Io.Writer = null;
 

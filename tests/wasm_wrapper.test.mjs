@@ -27,6 +27,26 @@ if (!isCompatible("1 m", "km")) {
   throw new Error("compatibility check failed");
 }
 
+// The dimensionless unit is 1. Its compatibility probe used to be "1 1",
+// which is not an expression, so no fraction was compatible with it.
+for (const expression of ["0.5", "500 ppm", "5 percent", "5 %", "5%", "0.5 mol/mol"]) {
+  if (!isCompatible(expression, "1")) {
+    throw new Error(`${expression} should be compatible with 1`);
+  }
+}
+if (isCompatible("3 m", "1")) {
+  throw new Error("a length is not dimensionless");
+}
+if (Math.abs(convertValue(500, "ppm", "1") - 5e-4) > 1e-15) {
+  throw new Error("ppm conversion to 1 failed");
+}
+if (Math.abs(convertValue(5, "percent", "ppm") - 5e4) > 1e-9) {
+  throw new Error("percent conversion to ppm failed");
+}
+if (Math.abs(convertValue(5, "%", "1") - 0.05) > 1e-15) {
+  throw new Error("% conversion to 1 failed");
+}
+
 for (const [expression, status] of [
   ["1 m trailing", DIM_STATUS.parseError],
   ["1 / 0", DIM_STATUS.divisionByZero],

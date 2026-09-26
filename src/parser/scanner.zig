@@ -73,6 +73,8 @@ pub const Scanner = struct {
             '+' => try self.addToken(TokenType.Plus, null),
             '*' => try self.addToken(TokenType.Star, null),
             '^' => try self.addToken(TokenType.Caret, null),
+            // `%` is a unit, the percent: "5 %", "5%" and "0.05 as %".
+            '%' => try self.addToken(TokenType.Identifier, null),
             '!' => try self.addToken(if (self.match('=')) TokenType.BangEqual else TokenType.Bang, null),
             '=' => try self.addToken(if (self.match('=')) TokenType.EqualEqual else TokenType.Equal, null),
             '<' => try self.addToken(if (self.match('=')) TokenType.LessEqual else TokenType.Less, null),

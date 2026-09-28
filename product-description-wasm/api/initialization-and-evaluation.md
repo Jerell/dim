@@ -33,7 +33,7 @@ The caller chooses explicit bytes, base64, a URL, or default asset discovery. Th
 
 ### Compute
 
-The wrapper encodes and normalizes the expression, allocates input and result buffers, calls the WASM context evaluator, checks the status, and reads the result kind and fields. Numbers, booleans, strings, quantities, and nil have different structured shapes.
+The wrapper encodes and normalizes the expression, allocates input and result buffers, calls the WASM context evaluator, checks the status, and reads the result kind and fields. Numbers, booleans, strings, quantities, and nil have different structured shapes. A quantity's `value` is in its reported `unit`, as the native CLI prints it: `5 bar` gives 5 with unit `bar`, and `45 degC as K` gives 318.15 with unit `K`. An expression whose result has no single named unit reports SI, so `100 km/h` gives 27.78 with unit `m/s`.
 
 ### Read and format
 

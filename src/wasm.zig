@@ -188,7 +188,7 @@ fn fillQuantityResult(out: *DimQuantityResult, dq: dim.DisplayQuantity) void {
     out.* = std.mem.zeroes(DimQuantityResult);
     out.mode = formatModeValue(dq.mode);
     out.is_delta = if (dq.is_delta) 1 else 0;
-    out.value = dq.value;
+    out.value = dq.valueForCurrentUnit();
     fillDimensionsQuantity(dq.dim, out);
     out.unit_ptr = @intFromPtr(dq.unit.ptr);
     out.unit_len = dq.unit.len;
@@ -214,7 +214,8 @@ fn fillEvalResult(out: *DimEvalResult, value: dim.LiteralValue) void {
             out.kind = @intFromEnum(DimValueKind.quantity);
             out.mode = formatModeValue(dq.mode);
             out.is_delta = if (dq.is_delta) 1 else 0;
-            out.quantity_value = dq.value;
+            // The value is in `unit`, as the native formatter prints it.
+            out.quantity_value = dq.valueForCurrentUnit();
             fillDimensionsEval(dq.dim, out);
             out.unit_ptr = @intFromPtr(dq.unit.ptr);
             out.unit_len = dq.unit.len;
@@ -378,7 +379,7 @@ pub export fn dim_ctx_convert_value(
 
     switch (result) {
         .display_quantity => |dq| {
-            out_value.* = dq.value;
+            out_value.* = dq.valueForCurrentUnit();
             return statusCode(.ok);
         },
         else => return statusCode(.wrong_kind),

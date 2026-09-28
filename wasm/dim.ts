@@ -690,27 +690,38 @@ function isDimensionless(dim: DimDimension): boolean {
   return BASE_UNIT_COMPONENTS.every(({ key }) => dim[key].num === 0);
 }
 
+/**
+ * Rounds to 15 significant digits for display, as the native formatter does.
+ * A unit whose scale is not exact in binary leaves round-trip noise, such as
+ * 500.00000000000006 ppm; fifteen digits is the precision every double holds.
+ */
+function displayRounded(value: number): number {
+  if (value === 0 || !Number.isFinite(value)) return value;
+  return Number(value.toPrecision(15));
+}
+
 export function formatQuantity(result: DimQuantityResult): string {
+  const value = displayRounded(result.value);
   const prefix = result.isDelta ? "\u0394" : "";
   const showUnit = !isDimensionless(result.dim) || result.unit !== "1";
   const suffix = showUnit ? ` ${result.unit}` : "";
   switch (result.mode) {
     case "auto":
-      return `${prefix}${result.value.toFixed(3)}${suffix}`;
+      return `${prefix}${value.toFixed(3)}${suffix}`;
     case "scientific":
-      return `${prefix}${formatScientific(result.value)}${suffix}`;
+      return `${prefix}${formatScientific(value)}${suffix}`;
     case "engineering": {
-      if (result.value === 0) {
+      if (value === 0) {
         return `${prefix}0.000${suffix}`;
       }
-      const exponent = Math.floor(Math.log10(Math.abs(result.value)));
+      const exponent = Math.floor(Math.log10(Math.abs(value)));
       const engineeringExponent = exponent - mod(exponent, 3);
-      const scaled = result.value / 10 ** engineeringExponent;
+      const scaled = value / 10 ** engineeringExponent;
       return `${prefix}${scaled.toFixed(3)}e${engineeringExponent}${suffix}`;
     }
     case "none":
     default:
-      return `${prefix}${result.value}${suffix}`;
+      return `${prefix}${value}${suffix}`;
   }
 }
 

@@ -20,6 +20,28 @@ if (quantity.kind !== "quantity" || Math.abs(quantity.value - 27.7777777778) > 1
   throw new Error(`unexpected structured result: ${JSON.stringify(quantity)}`);
 }
 
+// A quantity's value is in the unit it reports, as the native CLI prints it,
+// not in SI base units under the typed unit's label.
+for (const [expression, value, unit] of [
+  ["5 bar", 5, "bar"],
+  ["45 degC", 45, "degC"],
+  ["500 ppm", 500, "ppm"],
+  ["2 m + 30 cm", 2.3, "m"],
+  ["45 degC as K", 318.15, "K"],
+]) {
+  const result = evalStructured(expression);
+  if (
+    result.kind !== "quantity" ||
+    result.unit !== unit ||
+    Math.abs(result.value - value) > 1e-9
+  ) {
+    throw new Error(`${expression}: unexpected result ${JSON.stringify(result)}`);
+  }
+  if (formatEvalResult(result) !== `${value} ${unit}`) {
+    throw new Error(`${expression}: formatted as ${formatEvalResult(result)}`);
+  }
+}
+
 if (convertValue(1, "bar", "Pa") !== 100000) {
   throw new Error("direct conversion failed");
 }

@@ -3,6 +3,7 @@ import {
   batchConvertValues,
   clearAllConsts,
   convertValue,
+  convertExpr,
   DIM_STATUS,
   DimWasmError,
   evalStructured,
@@ -39,6 +40,24 @@ for (const [expression, value, unit] of [
   }
   if (formatEvalResult(result) !== `${value} ${unit}`) {
     throw new Error(`${expression}: formatted as ${formatEvalResult(result)}`);
+  }
+}
+
+for (const unit of ["um", "µm", "μm", "micrometer", "micrometre"]) {
+  const expression = `45 ${unit}`;
+  const authored = evalStructured(expression);
+  if (authored.kind !== "quantity" || authored.unit !== unit || authored.value !== 45) {
+    throw new Error(`${expression}: authored unit was lost`);
+  }
+  const converted = convertExpr(expression, "m");
+  if (Math.abs(converted.value - 45e-6) > 1e-15 || !isCompatible(expression, "m")) {
+    throw new Error(`${expression}: micrometre conversion failed`);
+  }
+  if (isCompatible(expression, "Pa")) {
+    throw new Error(`${expression}: a length is not a pressure`);
+  }
+  if (Math.abs(convertValue(45e-6, "m", unit) - 45) > 1e-12) {
+    throw new Error(`${expression}: conversion target failed`);
   }
 }
 

@@ -523,6 +523,37 @@ test "unit lookup handles aliases and rejects prefixed affine units" {
     try std.testing.expect(findUnitAll("mC") == null);
 }
 
+test "micrometre spellings share length dimensions and scale" {
+    for ([_][]const u8{ "um", "µm", "μm", "micrometer", "micrometre" }) |symbol| {
+        const unit = findUnitAll(symbol) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(Dimension.eql(unit.dim, Dimensions.Length));
+        try std.testing.expectApproxEqAbs(1e-6, unit.scale, 1e-18);
+        const expression = try std.fmt.allocPrint(std.testing.allocator, "45 {s} as m", .{symbol});
+        defer std.testing.allocator.free(expression);
+        var result = try evaluate(std.testing.allocator, expression, null);
+        defer deinitLiteralValue(std.testing.allocator, &result);
+        switch (result) {
+            .display_quantity => |dq| try std.testing.expectApproxEqAbs(45e-6, dq.value, 1e-15),
+            else => return error.TestUnexpectedResult,
+        }
+    }
+    var compound = try evaluate(std.testing.allocator, "2µm * 3μm as m2", null);
+    defer deinitLiteralValue(std.testing.allocator, &compound);
+    switch (compound) {
+        .display_quantity => |dq| try std.testing.expectApproxEqAbs(6e-12, dq.value, 1e-24),
+        else => return error.TestUnexpectedResult,
+    }
+    for ([_][]const u8{ "uC", "µC", "μC", "microC" }) |symbol| {
+        try std.testing.expect(findUnitAll(symbol) == null);
+    }
+}
+
+test "micro identifiers reject incomplete UTF-8 sequences" {
+    for ([_][]const u8{ "45 \xc2", "45 \xce", "45 \xc2m", "45 \xceb" }) |expression| {
+        try std.testing.expectError(error.InvalidToken, evaluate(std.testing.allocator, expression, null));
+    }
+}
+
 test "volume units cover litres and both gallons" {
     const litre = findUnitAll("L") orelse return error.TestUnexpectedResult;
     try std.testing.expect(Dimension.eql(litre.dim, Dimensions.Volume));

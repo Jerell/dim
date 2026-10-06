@@ -62,6 +62,12 @@ pub const Scanner = struct {
             try self.addToken(TokenType.Star, null);
             return;
         }
+        // U+00B5 MICRO SIGN and U+03BC GREEK SMALL LETTER MU are unit identifiers.
+        if (isMicro(c, self.peek())) {
+            _ = self.advance();
+            try self.identifier();
+            return;
+        }
         if (try self.superscript(c)) return;
         switch (c) {
             '(' => try self.addToken(TokenType.LParen, null),
@@ -209,7 +215,9 @@ pub const Scanner = struct {
     fn identifier(self: *Scanner) !void {
         while (true) {
             const c = self.peek();
-            if (isAlphaNumeric(c)) {
+            if (isMicro(c, self.peekNext())) {
+                self.current += 2;
+            } else if (isAlphaNumeric(c)) {
                 _ = self.advance();
             } else if (c == 0xC2) {
                 // Could be superscript (¹, ², ³) or middle dot (·)
@@ -289,6 +297,10 @@ pub const Scanner = struct {
 
 fn isDigit(char: u8) bool {
     return char >= '0' and char <= '9';
+}
+
+fn isMicro(first: u8, second: u8) bool {
+    return (first == 0xC2 and second == 0xB5) or (first == 0xCE and second == 0xBC);
 }
 
 fn isAlpha(char: u8) bool {

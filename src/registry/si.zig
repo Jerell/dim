@@ -57,6 +57,8 @@ pub const Units = [_]dim.Unit{
 };
 
 const aliases = [_]dim.Alias{
+    .{ .symbol = "meter", .target = &m },
+    .{ .symbol = "metre", .target = &m },
     .{ .symbol = "m2", .target = &m2 },
     .{ .symbol = "m3", .target = &m3 },
     .{ .symbol = "l", .target = &L },
@@ -88,6 +90,9 @@ const prefixes = [_]dim.Prefix{
     .{ .symbol = "c", .factor = 1e-2 },
     .{ .symbol = "m", .factor = 1e-3 },
     .{ .symbol = "µ", .factor = 1e-6 },
+    .{ .symbol = "μ", .factor = 1e-6 },
+    .{ .symbol = "u", .factor = 1e-6 },
+    .{ .symbol = "micro", .factor = 1e-6 },
     .{ .symbol = "n", .factor = 1e-9 },
     .{ .symbol = "p", .factor = 1e-12 },
     .{ .symbol = "f", .factor = 1e-15 },

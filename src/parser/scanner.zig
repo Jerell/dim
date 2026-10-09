@@ -68,6 +68,18 @@ pub const Scanner = struct {
             try self.identifier();
             return;
         }
+        // U+00B0 DEGREE SIGN starts a temperature unit: "°C", "°F".
+        if (c == 0xC2 and self.peek() == 0xB0) {
+            _ = self.advance();
+            try self.identifier();
+            return;
+        }
+        // U+2103 DEGREE CELSIUS and U+2109 DEGREE FAHRENHEIT are whole unit identifiers.
+        if (c == 0xE2 and self.peek() == 0x84 and (self.peekNext() == 0x83 or self.peekNext() == 0x89)) {
+            self.current += 2;
+            try self.addToken(TokenType.Identifier, null);
+            return;
+        }
         if (try self.superscript(c)) return;
         switch (c) {
             '(' => try self.addToken(TokenType.LParen, null),

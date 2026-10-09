@@ -554,6 +554,59 @@ test "micro identifiers reject incomplete UTF-8 sequences" {
     }
 }
 
+test "degree-sign temperature spellings are absolute Celsius and Fahrenheit" {
+    for ([_]struct { expression: []const u8, kelvin: f64 }{
+        .{ .expression = "50 °C as K", .kelvin = 323.15 },
+        .{ .expression = "50°C as K", .kelvin = 323.15 },
+        .{ .expression = "50 degC as K", .kelvin = 323.15 },
+        .{ .expression = "50 C as K", .kelvin = 323.15 },
+        .{ .expression = "122 °F as K", .kelvin = 323.15 },
+        .{ .expression = "50 ℃ as K", .kelvin = 323.15 },
+        .{ .expression = "122 ℉ as K", .kelvin = 323.15 },
+    }) |case| {
+        var result = try evaluate(std.testing.allocator, case.expression, null);
+        defer deinitLiteralValue(std.testing.allocator, &result);
+        switch (result) {
+            .display_quantity => |dq| try std.testing.expectApproxEqAbs(case.kelvin, dq.value, 1e-9),
+            else => return error.TestUnexpectedResult,
+        }
+    }
+    var celsius = try evaluate(std.testing.allocator, "323.15 K as °C", null);
+    defer deinitLiteralValue(std.testing.allocator, &celsius);
+    switch (celsius) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(50.0, dq.value, 1e-9);
+            try std.testing.expectEqualStrings("°C", dq.unit);
+        },
+        else => return error.TestUnexpectedResult,
+    }
+    try std.testing.expect(findUnitAll("m°C") == null);
+    try std.testing.expectError(error.InvalidToken, evaluate(std.testing.allocator, "50 \xc2", null));
+}
+
+test "an affine unit inside a compound unit is a step, not an absolute temperature" {
+    for ([_]struct { expression: []const u8, value: f64 }{
+        .{ .expression = "4180 J/(kg*°C) as J/(kg*K)", .value = 4180.0 },
+        .{ .expression = "4180 J/kg/C as J/kg/K", .value = 4180.0 },
+        .{ .expression = "4180 J/(kg*K) as J/(kg*℃)", .value = 4180.0 },
+        .{ .expression = "9 W/(m*°F) as W/(m*K)", .value = 16.2 },
+        .{ .expression = "10 °C/s as K/s", .value = 10.0 },
+    }) |case| {
+        var result = try evaluate(std.testing.allocator, case.expression, null);
+        defer deinitLiteralValue(std.testing.allocator, &result);
+        switch (result) {
+            .display_quantity => |dq| try std.testing.expectApproxEqAbs(case.value, dq.value, 1e-9),
+            else => return error.TestUnexpectedResult,
+        }
+    }
+    var conductivity = try evaluate(std.testing.allocator, "2 W/(m*K)", null);
+    defer deinitLiteralValue(std.testing.allocator, &conductivity);
+    switch (conductivity) {
+        .display_quantity => |dq| try std.testing.expect(std.mem.indexOf(u8, dq.unit, "°C") == null),
+        else => return error.TestUnexpectedResult,
+    }
+}
+
 test "volume units cover litres and both gallons" {
     const litre = findUnitAll("L") orelse return error.TestUnexpectedResult;
     try std.testing.expect(Dimension.eql(litre.dim, Dimensions.Volume));

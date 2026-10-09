@@ -61,6 +61,36 @@ for (const unit of ["um", "µm", "μm", "micrometer", "micrometre"]) {
   }
 }
 
+for (const [unit, kelvin] of [
+  ["°C", 323.15],
+  ["℃", 323.15],
+  ["degC", 323.15],
+  ["C", 323.15],
+  ["°F", 283.15],
+  ["℉", 283.15],
+]) {
+  const expression = `50 ${unit}`;
+  const authored = evalStructured(expression);
+  if (authored.kind !== "quantity" || authored.unit !== unit || authored.value !== 50) {
+    throw new Error(`${expression}: authored unit was lost`);
+  }
+  if (Math.abs(convertExpr(expression, "K").value - kelvin) > 1e-9) {
+    throw new Error(`${expression}: absolute temperature conversion failed`);
+  }
+  if (Math.abs(convertValue(kelvin, "K", unit) - 50) > 1e-9) {
+    throw new Error(`${expression}: conversion target failed`);
+  }
+}
+
+for (const unit of ["J/(kg*°C)", "J/(kg*℃)", "J/kg/C"]) {
+  if (Math.abs(convertExpr(`4180 ${unit}`, "J/(kg*K)").value - 4180) > 1e-9) {
+    throw new Error(`${unit}: a degree inside a compound unit is a step`);
+  }
+  if (Math.abs(convertValue(4180, "J/(kg*K)", unit) - 4180) > 1e-9) {
+    throw new Error(`${unit}: compound conversion target failed`);
+  }
+}
+
 if (convertValue(1, "bar", "Pa") !== 100000) {
   throw new Error("direct conversion failed");
 }

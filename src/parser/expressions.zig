@@ -497,8 +497,10 @@ pub const UnitExpr = struct {
         else
             Dimension.checkedMulByRational(u.dim, self.exponent) orelse return RuntimeError.DimensionOverflow;
 
-        // Compute conversion factor to canonical for this unit (raised to exponent)
-        const base_factor = u.toCanonical(1.0);
+        // Compute conversion factor to canonical for this unit (raised to exponent).
+        // A unit used as a factor is a step of that unit, so an affine unit
+        // contributes its scale and not its offset: "J/(kg*°C)" is "J/(kg*K)".
+        const base_factor = u.scale;
         const factor = if (self.exponent.eqlInt(1))
             base_factor
         else

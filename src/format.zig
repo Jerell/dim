@@ -175,7 +175,7 @@ const BaseSymbols = struct {
 fn detectBaseSymbols(reg: UnitRegistry) BaseSymbols {
     var base = BaseSymbols{};
     for (reg.units) |u| {
-        if (u.scale != 1.0) continue;
+        if (u.scale != 1.0 or u.isAffine()) continue;
         const d = u.dim;
         if (Dimension.eql(d, Dimension.initInts(1, 0, 0, 0, 0, 0, 0))) base.L = u.symbol;
         if (Dimension.eql(d, Dimension.initInts(0, 1, 0, 0, 0, 0, 0))) base.M = u.symbol;

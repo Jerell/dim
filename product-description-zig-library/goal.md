@@ -32,7 +32,7 @@ Use the glossary's terms. Describe what the consumer can observe; use `> Technic
 - `Quantity(Dimension)` carries a canonical `f64` value and `is_delta` state.
 - Quantity dimensions are represented in the type returned by the generic `Quantity` constructor.
 - `from` checks comptime unit dimensions; `fromDynamic` returns `DimensionMismatch` at runtime.
-- Unit composition operations return `UnitCompositionError!Unit`; affine participants produce `error.AffineUnitCombination`. Quantity unchecked variants remain separate APIs with explicit preconditions.
+- Unit composition operations return `UnitCompositionError!Unit`; affine participants produce `error.AffineUnitCombination`. Quantity `mul` and `div` are infallible.
 - `evaluateWithContext` isolates runtime constants and scratch storage in an explicit `DimContext`; convenience evaluation uses a thread-local default context.
 - Returned display quantities and strings copied into a caller allocator must be released with their corresponding deinitializers.
 - Built-in unit lookup checks constants first, exact/alias matches before prefixes, and then prefix expansion.

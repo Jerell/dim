@@ -40,9 +40,9 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Typed arithmetic.** Quantity addition, subtraction, multiplication, division, scaling, and powers whose dimensions are represented in the Zig type system.
 
-**Checked operation.** An operation that returns an error when runtime state makes an otherwise typed operation unsafe, such as multiplying a temperature delta or composing affine units.
+**Checked operation.** An operation that returns an error when runtime state makes an otherwise typed operation unsafe, such as composing affine units, or multiplying an absolute value in an offset unit through the display helpers.
 
-**Unchecked operation.** An operation that skips a runtime safety check because the caller has already established that the operands are multiplicative and safe.
+**Unchecked operation.** An operation that assumes its result is representable instead of returning an error, such as ordinary dimension arithmetic; the checked dimension helpers return a nullable result on overflow. Quantity `mul` and `div` have no checked or unchecked variants and cannot fail.
 
 **Context.** A `DimContext` owning runtime constants and scratch storage. Explicit contexts isolate state between consumers or workers.
 
@@ -68,9 +68,9 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Compile-time rejection.** A type or dimension rule prevents compilation; no runtime operation begins.
 
-**Runtime error.** An error union result such as `DimensionMismatch`, `MulDivTemperatureDelta`, or `AffineUnitCombination` that the caller can handle.
+**Runtime error.** An error union result such as `DimensionMismatch`, `OffsetUnitArithmetic`, or `AffineUnitCombination` that the caller can handle.
 
-**Panic or assertion.** An unrecoverable failure path, including an unchecked Quantity precondition or a failed allocation that the caller does not handle. Unit affine composition returns an error instead of asserting.
+**Panic or assertion.** An unrecoverable failure path, such as a failed allocation that the caller does not handle. Unit affine composition returns an error instead of asserting.
 
 **Return.** The operation has produced a value or error and the caller regains control. A return does not imply that allocator-owned results have been deinitialized.
 

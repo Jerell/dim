@@ -16,6 +16,8 @@ pub const subDisplay = @import("runtime.zig").subDisplay;
 pub const mulDisplay = @import("runtime.zig").mulDisplay;
 pub const divDisplay = @import("runtime.zig").divDisplay;
 pub const scaleDisplay = @import("runtime.zig").scaleDisplay;
+pub const deltaDisplay = @import("runtime.zig").deltaDisplay;
+pub const isOffsetPoint = @import("runtime.zig").isOffsetPoint;
 pub const powDisplay = @import("runtime.zig").powDisplay;
 pub const powDisplayInt = @import("runtime.zig").powDisplayInt;
 pub const powDisplayRational = @import("runtime.zig").powDisplayRational;
@@ -665,6 +667,25 @@ test "subtracting temperatures gives a difference that multiplies" {
     try expectQuantity("4180 J/(kg*°C) * (30 °C - 20 °C) as J/kg", 41800.0, "J/kg", false);
     try expectQuantity("(30 °C - 20 °C) * 4180 J/(kg*K) as J/kg", 41800.0, "J/kg", false);
     try expectQuantity("100 W / (30 °C - 20 °C) as W/K", 10.0, "W/K", false);
+}
+
+test "a delta literal is a difference, not a point on the scale" {
+    try expectQuantity("Δ20 °C", 20.0, "°C", true);
+    try expectQuantity("delta 20 °C", 20.0, "°C", true);
+    try expectQuantity("Δ20 °C as K", 20.0, "K", true);
+    try expectQuantity("Δ18 °F as °C", 10.0, "°C", true);
+    try expectQuantity("30 °C - Δ20 °C", 10.0, "°C", false);
+    try expectQuantity("30 °C + delta 20 °C", 50.0, "°C", false);
+    try expectQuantity("Δ20 °C + 30 °C", 50.0, "°C", false);
+    try expectQuantity("Δ20 °C * 2", 40.0, "°C", true);
+    try expectQuantity("4180 J/(kg*°C) * Δ10 °C as J/kg", 41800.0, "J/kg", false);
+    try expectQuantity("delta -5 °C", -5.0, "°C", true);
+    try expectQuantity("Δ(30 °C - 20 °C)", 10.0, "°C", true);
+    try expectQuantity("Δ2 barg", 2.0, "bar", true);
+    try expectQuantity("10 barg - Δ2 barg", 8.0, "barg", false);
+    try expectQuantity("Δ5 K", 5.0, "K", true);
+    try std.testing.expectError(error.InvalidOperand, evaluate(std.testing.allocator, "delta 5", null));
+    try std.testing.expectError(error.OffsetUnitArithmetic, evaluate(std.testing.allocator, "-(10 °C)", null));
 }
 
 test "volume units cover litres and both gallons" {

@@ -38,6 +38,7 @@ arithmetic on it follows what the expression says:
 | --- | --- | --- |
 | `20 °C + 10 °C` | `30 °C` | The right side of an addition is a change. |
 | `30 °C - 20 °C` | `Δ10 °C` | Subtracting two points gives a difference. |
+| `30 °C - Δ20 °C` | `10 °C` | `Δ` or `delta` before a quantity writes a difference directly. |
 | `4180 J/(kg*°C) * (30 °C - 20 °C)` | `41800 m²/s^2` | A difference multiplies like any amount. |
 | `2 * 10 °C`, `10 °C / 2` | `OffsetUnitArithmetic` | A point is not multiplied, divided, scaled or raised. |
 | `(25 °C as K) * 8.314 J/(mol*K)` | `2478.8191 kg*m^2/s^2*mol` | Convert to an absolute unit to use the absolute value. |

@@ -45,7 +45,7 @@ The caller receives a unit, a converted number, or a typed quantity. The unit sy
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Namespace/comptime unit versus dynamic symbol determines validation boundary. | Resolved unit does not change. |
-| Checked or unchecked operation | Unit composition is fallible; Quantity unchecked variants are a separate API. | Fixed for the call. |
+| Checked or unchecked operation | Unit composition is fallible; Quantity arithmetic is infallible. | Fixed for the call. |
 | Dimension and quantity type | Target quantity type must match unit dimension. | No effect. |
 | Registry and format mode | Registry controls lookup and formatting selection. | Later formatting can choose another registry. |
 | Affine or delta state | Unit offset and quantity delta choose conversion rule. | Current conversion uses captured state. |

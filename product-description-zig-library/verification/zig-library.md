@@ -26,7 +26,7 @@ Run `zig build test` from the source checkout. Use temporary consumer fixtures f
 | ID | P | Device | Claim | Setup | Steps | Expected | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | QTY-01 | P1 | consumer fixture | Typed arithmetic returns the derived numeric value ([return](../library/quantity-arithmetic.md#return)). | External consumer. | 1. Construct 100 m and 10 s.<br>2. Divide.<br>3. Read value. | Result is velocity with value 10. | — |
-| QTY-02 | P1 | consumer fixture | Temperature delta multiplication through checked API returns an error ([while executing](../library/quantity-arithmetic.md#while-executing)). | Temperature delta and length. | 1. Call checked multiplication.<br>2. Inspect error. | Error is `MulDivTemperatureDelta`. | — |
+| QTY-02 | P1 | consumer fixture | Temperature delta multiplication returns an ordinary quantity ([while executing](../library/quantity-arithmetic.md#while-executing)). | Temperature delta and length. | 1. Call `mul`.<br>2. Inspect the result. | Value is the product and `is_delta` is false. | — |
 
 ## library/unit-construction.md
 
@@ -68,4 +68,3 @@ Run `zig build test` from the source checkout. Use temporary consumer fixtures f
 Not checkable by hand:
 
 - Whether compiler diagnostics are understandable enough for consumers.
-- Whether Quantity unchecked preconditions are sufficiently discoverable as unsafe.

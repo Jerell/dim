@@ -96,10 +96,17 @@ for (const [expression, unit, value] of [
   ["4180 J/(kg*°C) * (30 °C - 20 °C)", "J/kg", 41800],
   ["(25 °C as K) * 2", "K", 596.3],
   ["10 barg + 2 barg", "barg", 12],
+  ["30 °C - Δ20 °C", "°C", 10],
+  ["30 °C + delta 20 °C", "K", 323.15],
+  ["4180 J/(kg*°C) * Δ10 °C", "J/kg", 41800],
 ]) {
   if (Math.abs(convertExpr(expression, unit).value - value) > 1e-9) {
     throw new Error(`${expression}: expected ${value} ${unit}`);
   }
+}
+const difference = evalStructured("Δ20 °C");
+if (difference.kind !== "quantity" || difference.value !== 20 || !difference.isDelta) {
+  throw new Error("Δ20 °C: expected a difference of twenty degrees");
 }
 for (const expression of ["2 * 10 °C", "10 °C / 2", "4180 J/(kg*°C) * 10 °C", "10 barg * 2"]) {
   try {

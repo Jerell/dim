@@ -33,11 +33,11 @@ Once compiled, quantity operations use canonical numeric values. Addition and su
 
 ### While executing
 
-Most dimension rules are already fixed in the type. Runtime state only affects rules that cannot be known at compile time, especially `is_delta` and checked temperature operations. No dimension registry lookup happens for a typed operation.
+Most dimension rules are already fixed in the type. Runtime state only affects rules that cannot be known at compile time, especially `is_delta`. No dimension registry lookup happens for a typed operation.
 
 ### Return
 
-The consumer receives a typed quantity or, for dynamic construction and checked runtime operations, an error union. The dimension is available for further compile-time use and can be compared at runtime with `Dimension.eql`.
+The consumer receives a typed quantity or, for dynamic construction, an error union. The dimension is available for further compile-time use and can be compared at runtime with `Dimension.eql`.
 
 ## Modifiers
 
@@ -47,7 +47,7 @@ The consumer receives a typed quantity or, for dynamic construction and checked 
 | Checked or unchecked operation | Checked dimension helpers return nullable/error outcomes; ordinary arithmetic assumes representable dimensions. | The selected method cannot change mid-call. |
 | Dimension and quantity type | The selected `Dimension` fixes the quantity type. | No effect. |
 | Registry and format mode | No effect on dimension derivation. | No effect. |
-| Affine or delta state | The dimension identifies temperature/pressure rules; delta is stored on the value. | Delta state can change whether checked arithmetic returns an error. |
+| Affine or delta state | The dimension identifies temperature/pressure rules; delta is stored on the value. | Delta state changes add and subtract results; it never makes Quantity arithmetic fail. |
 | Allocator and context | No effect on typed dimensions. | No effect. |
 
 ## Cancel and interrupt
@@ -57,7 +57,7 @@ The consumer receives a typed quantity or, for dynamic construction and checked 
 | Compile-time rejection | The program does not compile. | No type mutation is possible. |
 | Caller doing another operation | The caller can choose a different typed expression. | The current call returns synchronously. |
 | Operation completes before extension | Type construction and dimension calculation complete immediately. | No partial dimension is exposed. |
-| Runtime error or panic | Dynamic mismatch can return an error. | Checked delta violations and Unit affine combinations return errors; Quantity unchecked variants retain their preconditions. |
+| Runtime error or panic | Dynamic mismatch can return an error. | Unit affine combinations return errors; Quantity arithmetic has no runtime error. |
 | Allocator failure or resource teardown | Dimension values do not allocate. | No effect. |
 | Input value/type/unit changing | A new type or unit is part of a later call/build. | Existing result is unaffected. |
 | Second context or thread using same state | Dimensions are immutable values. | Independent. |

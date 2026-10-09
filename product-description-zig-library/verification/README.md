@@ -25,7 +25,7 @@ These checklists compare the Zig library documents with consumer code compiled a
 
 ## Driving the product from a script
 
-The public library has no standalone UI. `zig build test` and consumer fixtures are the primary driver. Scripts can observe values, error unions, ownership cleanup, and compilation success/failure. They cannot decide whether compiler diagnostics are understandable or whether unchecked APIs are sufficiently discoverable.
+The public library has no standalone UI. `zig build test` and consumer fixtures are the primary driver. Scripts can observe values, error unions, ownership cleanup, and compilation success/failure. They cannot decide whether compiler diagnostics are understandable.
 
 ## Results so far
 

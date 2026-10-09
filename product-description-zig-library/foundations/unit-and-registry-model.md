@@ -46,7 +46,7 @@ The consumer receives a `Unit`, a typed quantity, a converted number, or an erro
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Comptime namespace gives compile-time checks; lookup resolves at runtime. | A resolved unit value does not change. |
-| Checked or unchecked operation | Unit composition always returns an affine-combination error when unsafe; Quantity variants have their own checked/unchecked methods. | Method choice is fixed. |
+| Checked or unchecked operation | Unit composition always returns an affine-combination error when unsafe; Quantity arithmetic is infallible. | Method choice is fixed. |
 | Dimension and quantity type | Quantity construction requires matching unit dimension. | No effect. |
 | Registry and format mode | Registry selection determines lookup/format choices. | A later formatting call can use another registry. |
 | Affine or delta state | Unit offset determines absolute conversion; delta flag selects scale-only conversion. | Delta state belongs to the quantity conversion call. |

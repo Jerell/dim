@@ -6,7 +6,7 @@ The library deliberately splits dimensional mistakes into compile-time rejection
 
 ## The simple case
 
-Adding a length quantity to a time quantity does not produce an executable. Constructing a length from a runtime unit with a time dimension compiles but returns `DimensionMismatch`. Multiplying a temperature delta returns `MulDivTemperatureDelta` from checked runtime methods.
+Adding a length quantity to a time quantity does not produce an executable. Constructing a length from a runtime unit with a time dimension compiles but returns `DimensionMismatch`. Multiplying an absolute value in an offset unit through the display helpers returns `OffsetUnitArithmetic`.
 
 ## The interaction, event by event
 
@@ -33,7 +33,7 @@ Compiled code enters runtime checks for dynamic unit dimensions, affine/delta st
 
 ### While executing
 
-Fallible APIs return errors instead of asserting where the library has an explicit error path. Unit composition rejects affine values through `UnitCompositionError`; Quantity unchecked variants still require caller-established preconditions. Expression evaluation preserves parse and runtime error categories.
+Fallible APIs return errors instead of asserting where the library has an explicit error path. Unit composition rejects affine values through `UnitCompositionError`; Quantity `mul` and `div` are infallible. Expression evaluation preserves parse and runtime error categories.
 
 ### Return
 
@@ -44,10 +44,10 @@ The consumer either receives a value, an error union, null, or no executable at 
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Chooses rejection versus runtime checking. | Fixed by API call. |
-| Checked or unchecked operation | Unit composition is fallible; Quantity unchecked variants choose assumption over error return. | Cannot change. |
+| Checked or unchecked operation | Unit composition is fallible; Quantity arithmetic is infallible. | Cannot change. |
 | Dimension and quantity type | Fixes compile-time guarantees. | Types cannot change. |
 | Registry and format mode | Mostly runtime lookup/output concerns. | No effect on a compiled type. |
-| Affine or delta state | Determines runtime checked errors. | Current value state is fixed for the call. |
+| Affine or delta state | Determines add and subtract results, and whether a display helper returns `OffsetUnitArithmetic`. | Current value state is fixed for the call. |
 | Allocator and context | Determines runtime failure/ownership paths. | Context can be reused only after the operation returns. |
 
 ## Cancel and interrupt
@@ -57,7 +57,7 @@ The consumer either receives a value, an error union, null, or no executable at 
 | Compile-time rejection | Build stops before execution. | No in-flight compile operation exists. |
 | Caller doing another operation | Caller revises source or chooses another API. | Current runtime call completes synchronously. |
 | Operation completes before extension | Type checks are immediate. | No partial executable result. |
-| Runtime error or panic | Caller can handle documented runtime errors. | Only APIs with explicit unchecked preconditions can assume instead of returning. |
+| Runtime error or panic | Caller can handle documented runtime errors. | Dimension arithmetic without the checked helpers assumes representable exponents. |
 | Allocator failure or resource teardown | Runtime allocation can fail. | Cleanup responsibility remains with caller. |
 | Input value/type/unit changing | New source/build is needed for type changes. | Values are captured by the current call. |
 | Second context or thread using same state | Typed values are independent; contexts isolate dynamic state. | Shared contexts require protection. |
@@ -70,7 +70,7 @@ The consumer either receives a value, an error union, null, or no executable at 
 
 **Units and registries.** Comptime units provide stronger checks than runtime lookup.
 
-**Affine and delta semantics.** Runtime markers require checked methods.
+**Affine and delta semantics.** Runtime markers decide add and subtract results; the display helpers refuse arithmetic on offset points.
 
 **Formatting.** Writer/dimension mismatches can still fail after successful compilation.
 
@@ -87,10 +87,10 @@ The consumer either receives a value, an error union, null, or no executable at 
 - `fromDynamic` is the intended runtime counterpart to comptime `from`.
 - `div` can return an error even when its operand types are valid because delta state is runtime.
 - `evaluate` returns granular parse, runtime, and allocation errors.
-- Unchecked APIs are safe only when the caller has established their preconditions.
+- Unchecked dimension arithmetic is safe only when the caller has established that exponents stay representable.
 
 ## Open questions and verification
 
-- Public documentation should keep Quantity unchecked preconditions prominent.- A compile-failure fixture should be maintained to verify the intended diagnostics across Zig versions.
+- A compile-failure fixture should be maintained to verify the intended diagnostics across Zig versions.
 
 Verified against /Users/jerell/Repos/dim commit `5d9cf0d`.

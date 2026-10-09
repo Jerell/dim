@@ -17,6 +17,8 @@ pub const TokenType = enum {
     Star,
     Slash,
     Caret,
+    // marks a quantity as a difference: "Δ20 °C", "delta 20 °C"
+    Delta,
     LParen,
     RParen,
     // for unit conversion

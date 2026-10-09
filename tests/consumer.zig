@@ -10,7 +10,7 @@ test "documented comptime unit namespace and typed arithmetic compile" {
 
     const distance = Length.from(2.0, Si.km);
     const elapsed = Time.from(1.0, Si.h);
-    const speed = try distance.div(elapsed);
+    const speed = distance.div(elapsed);
 
     try std.testing.expectApproxEqAbs(2.0 / 3.6, speed.value, 1e-12);
     try std.testing.expectApproxEqAbs(6000.0, distance.scale(3.0).unscale(1.0).value, 1e-12);
@@ -22,7 +22,7 @@ test "README formatting and evaluation surface compiles" {
     const Time = dim.Quantity(dim.Dimensions.Time);
     const distance = Length.from(100.0, Si.km);
     const elapsed = Time.from(1.0, Si.h);
-    const speed = try distance.div(elapsed);
+    const speed = distance.div(elapsed);
     const kmh = try Si.km.div(Si.h, "km/h");
     _ = ContainerKmH;
 
@@ -41,16 +41,15 @@ test "README formatting and evaluation surface compiles" {
     );
 }
 
-test "temperature delta checks are runtime-safe and scalar operations preserve state" {
+test "a temperature difference multiplies and scalar operations preserve state" {
     const Temp = dim.Quantity(dim.Dimensions.Temperature);
     const Length = dim.Quantity(dim.Dimensions.Length);
     const delta = (Temp{ .value = 10.0, .is_delta = true }).scale(2.0);
 
     try std.testing.expect(delta.is_delta);
-    try std.testing.expectError(
-        error.MulDivTemperatureDelta,
-        delta.mulChecked(Length.init(1.0)),
-    );
+    const product = delta.mul(Length.init(1.0));
+    try std.testing.expectApproxEqAbs(20.0, product.value, 1e-12);
+    try std.testing.expect(!product.is_delta);
 }
 
 test "display helpers return independently owned unit strings" {
@@ -71,7 +70,7 @@ test "display helpers return independently owned unit strings" {
     try std.testing.expectApproxEqAbs(4.0, sum.value, 1e-12);
 }
 
-test "expression display helpers reject temperature delta multiplication and division" {
+test "expression display helpers multiply a temperature difference and refuse a point on an offset scale" {
     const delta = dim.DisplayQuantity{
         .value = 1.0,
         .dim = dim.Dimensions.Temperature,
@@ -84,13 +83,26 @@ test "expression display helpers reject temperature delta multiplication and div
         .unit = "m",
     };
 
+    var product = try dim.mulDisplay(std.testing.allocator, delta, length);
+    defer product.deinit(std.testing.allocator);
+    try std.testing.expectApproxEqAbs(2.0, product.value, 1e-12);
+
+    const point = dim.DisplayQuantity{
+        .value = 283.15,
+        .dim = dim.Dimensions.Temperature,
+        .unit = "C",
+    };
     try std.testing.expectError(
-        error.MulDivTemperatureDelta,
-        dim.mulDisplay(std.testing.allocator, delta, length),
+        error.OffsetUnitArithmetic,
+        dim.mulDisplay(std.testing.allocator, point, length),
     );
     try std.testing.expectError(
-        error.MulDivTemperatureDelta,
-        dim.divDisplay(std.testing.allocator, length, delta),
+        error.OffsetUnitArithmetic,
+        dim.divDisplay(std.testing.allocator, length, point),
+    );
+    try std.testing.expectError(
+        error.OffsetUnitArithmetic,
+        dim.scaleDisplay(std.testing.allocator, point, 2.0),
     );
 }
 

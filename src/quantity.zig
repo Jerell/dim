@@ -5,10 +5,6 @@ const UnitRegistry = @import("unit.zig").UnitRegistry;
 const Unit = @import("unit.zig").Unit;
 const Format = @import("format.zig");
 
-pub const QuantityError = error{
-    MulDivTemperatureDelta,
-};
-
 fn quantityDim(comptime T: type) Dimension {
     // Require that T is a Quantity(...); we check it has a public const dim.
     if (@hasDecl(T, "dim")) {
@@ -133,53 +129,15 @@ pub fn Quantity(comptime Dim: Dimension) type {
             }
         }
 
-        /// Multiply quantities, rejecting affine temperature deltas.
-        /// The delta marker is runtime state, so this safety check returns an
-        /// error rather than using @compileError; dimension/type checks remain
-        /// compile-time enforced.
-        pub fn mul(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
-            const OtherDim = comptime quantityDim(@TypeOf(other));
-            if ((isTemperatureDim(Dim) and self.is_delta) or
-                (isTemperatureDim(OtherDim) and other.is_delta))
-            {
-                return error.MulDivTemperatureDelta;
-            }
-            return self.mulUnchecked(other);
-        }
-
-        /// Compatibility alias for callers that prefer an explicit name.
-        pub fn mulChecked(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
-            return self.mul(other);
-        }
-
-        /// Unchecked multiply for callers that have already established that
-        /// both operands are multiplicative quantities.
-        pub fn mulUnchecked(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
+        /// Multiply quantities. A temperature difference multiplies like any
+        /// other amount; the result is not a difference.
+        pub fn mul(self: Quantity(Dim), other: anytype) Quantity(Dimension.add(Dim, quantityDim(@TypeOf(other)))) {
             return .{ .value = self.value * other.value, .is_delta = false };
         }
 
-        /// Divide quantities, rejecting affine temperature deltas.
-        /// The delta marker is runtime state, so this safety check returns an
-        /// error rather than using @compileError; dimension/type checks remain
-        /// compile-time enforced.
-        pub fn div(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
-            const OtherDim = comptime quantityDim(@TypeOf(other));
-            if ((isTemperatureDim(Dim) and self.is_delta) or
-                (isTemperatureDim(OtherDim) and other.is_delta))
-            {
-                return error.MulDivTemperatureDelta;
-            }
-            return self.divUnchecked(other);
-        }
-
-        /// Compatibility alias for callers that prefer an explicit name.
-        pub fn divChecked(self: Quantity(Dim), other: anytype) QuantityError!Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
-            return self.div(other);
-        }
-
-        /// Unchecked divide for callers that have already established that
-        /// both operands are multiplicative quantities.
-        pub fn divUnchecked(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
+        /// Divide quantities. A temperature difference divides like any other
+        /// amount; the result is not a difference.
+        pub fn div(self: Quantity(Dim), other: anytype) Quantity(Dimension.sub(Dim, quantityDim(@TypeOf(other)))) {
             return .{ .value = self.value / other.value, .is_delta = false };
         }
 

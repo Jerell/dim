@@ -31,6 +31,19 @@ temperature: `50 °C as K` evaluates to `323.15 K`. As a factor of a compound
 unit it is a one-degree step, so `4180 J/(kg*°C) as J/(kg*K)` evaluates to
 `4180 J/kg*K`.
 
+A value in `°C`, `°F` or `barg` is a point on a scale with an offset, and
+arithmetic on it follows what the expression says:
+
+| Expression | Result | Rule |
+| --- | --- | --- |
+| `20 °C + 10 °C` | `30 °C` | The right side of an addition is a change. |
+| `30 °C - 20 °C` | `Δ10 °C` | Subtracting two points gives a difference. |
+| `4180 J/(kg*°C) * (30 °C - 20 °C)` | `41800 m²/s^2` | A difference multiplies like any amount. |
+| `2 * 10 °C`, `10 °C / 2` | `OffsetUnitArithmetic` | A point is not multiplied, divided, scaled or raised. |
+| `(25 °C as K) * 8.314 J/(mol*K)` | `2478.8191 kg*m^2/s^2*mol` | Convert to an absolute unit to use the absolute value. |
+
+The mean of two temperatures is `((10 °C as K) + (20 °C as K)) / 2 as °C`.
+
 ## ✨ Features
 
 - **Library (`dim`)**
@@ -87,7 +100,7 @@ pub fn main() !void {
     _ = .{ d0, t0, d1b, d2 };
 
     // typed arithmetic — v is Quantity(Velocity)
-    const v = try d1.div(t1);
+    const v = d1.div(t1);
 
     // print with default formatting
     std.debug.print("speed: {f} m/s\n", .{v});
@@ -106,9 +119,8 @@ pub fn main() !void {
 }
 ```
 
-`Quantity.mul` and `Quantity.div` reject affine temperature deltas with
-`error.MulDivTemperatureDelta`. Use `mulUnchecked` or `divUnchecked` only when
-the caller has already established that both operands are multiplicative.
+`Quantity` values are canonical, so a temperature is in kelvin and `mul` and
+`div` cannot fail. A temperature difference multiplies like any other amount.
 
 Unit composition is fallible in the 0.3 API: `Unit.mul`, `Unit.div`, `Unit.pow`,
 and `Unit.powRational` return `UnitCompositionError!Unit` and report

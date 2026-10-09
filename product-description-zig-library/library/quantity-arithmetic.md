@@ -90,7 +90,7 @@ The consumer receives a typed quantity and can read its value, compare its compi
 
 - `from` with a wrong-dimension comptime unit is a compile-time error; `fromDynamic` returns `DimensionMismatch`.
 - `div` derives a rational dimension at compile time and can return a quantity type not named in the source.
-- A temperature delta multiplied by a quantity returns `MulDivTemperatureDelta` from checked operations.
+- `mul` and `div` cannot fail. A temperature delta multiplied by a quantity gives an ordinary quantity that is not a delta.
 - `powRational` supports rational dimensions; `pow` accepts only integer exponents.
 - Division by a numeric zero is not guarded by the quantity type itself.
 

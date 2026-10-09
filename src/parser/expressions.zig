@@ -25,7 +25,7 @@ pub const RuntimeError = error{
     NonRationalDimensionalExponent,
     AffineUnitExponentiation,
     DimensionOverflow,
-    MulDivTemperatureDelta,
+    OffsetUnitArithmetic,
 };
 
 pub const LiteralValue = union(enum) {
@@ -399,6 +399,7 @@ pub const Display = struct {
         // - For simple unit expressions (single unit, exponent 1), use the unit's affine-aware fromCanonical().
         // - Otherwise, divide by multiplicative conversion factor.
         var converted_value: f64 = undefined;
+        var display_factor: f64 = 1.0;
         var output_unit = target.unit;
         switch (self.unit_expr.*) {
             .unit_expr => |ue| {
@@ -410,10 +411,12 @@ pub const Display = struct {
                     }
                 } else {
                     converted_value = source_canonical / target.value;
+                    display_factor = target.value;
                 }
             },
             else => {
                 converted_value = source_canonical / target.value;
+                display_factor = target.value;
             },
         }
 
@@ -427,6 +430,7 @@ pub const Display = struct {
             .mode = self.mode orelse .none,
             .is_delta = dq.is_delta,
             .value_space = .display,
+            .display_factor = display_factor,
         } };
     }
 };

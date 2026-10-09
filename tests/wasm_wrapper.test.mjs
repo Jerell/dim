@@ -91,6 +91,27 @@ for (const unit of ["J/(kg*°C)", "J/(kg*℃)", "J/kg/C"]) {
   }
 }
 
+for (const [expression, unit, value] of [
+  ["20 °C + 10 °C", "°C", 30],
+  ["4180 J/(kg*°C) * (30 °C - 20 °C)", "J/kg", 41800],
+  ["(25 °C as K) * 2", "K", 596.3],
+  ["10 barg + 2 barg", "barg", 12],
+]) {
+  if (Math.abs(convertExpr(expression, unit).value - value) > 1e-9) {
+    throw new Error(`${expression}: expected ${value} ${unit}`);
+  }
+}
+for (const expression of ["2 * 10 °C", "10 °C / 2", "4180 J/(kg*°C) * 10 °C", "10 barg * 2"]) {
+  try {
+    evalStructured(expression);
+    throw new Error(`${expression}: a point on an offset scale must not be scaled`);
+  } catch (cause) {
+    if (!(cause instanceof DimWasmError) || cause.status !== DIM_STATUS.offsetUnitArithmetic) {
+      throw cause;
+    }
+  }
+}
+
 if (convertValue(1, "bar", "Pa") !== 100000) {
   throw new Error("direct conversion failed");
 }

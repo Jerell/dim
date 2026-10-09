@@ -38,6 +38,9 @@ pub const DisplayQuantity = struct {
     mode: Format.FormatMode = .none,
     is_delta: bool = false,
     value_space: ValueSpace = .canonical,
+    // Canonical size of one display unit, for a display-space value whose
+    // unit is a compound expression and so has no registry entry.
+    display_factor: f64 = 1.0,
 
     pub fn format(self: DisplayQuantity, writer: *std.Io.Writer) !void {
         const display_value = displayRounded(self.valueForCurrentUnit());
@@ -92,7 +95,7 @@ pub const DisplayQuantity = struct {
         if (findBuiltinUnit(self.unit)) |u| {
             return u.toCanonicalValue(self.value, self.is_delta);
         }
-        return self.value;
+        return self.value * self.display_factor;
     }
 
     pub fn valueForCurrentUnit(self: DisplayQuantity) f64 {
@@ -112,6 +115,7 @@ pub const DisplayQuantity = struct {
 };
 
 pub fn scaleDisplay(allocator: std.mem.Allocator, dq: DisplayQuantity, factor: f64) !DisplayQuantity {
+    if (isOffsetPoint(dq)) return error.OffsetUnitArithmetic;
     return DisplayQuantity{
         .value = dq.value * factor,
         .dim = dq.dim,
@@ -120,12 +124,16 @@ pub fn scaleDisplay(allocator: std.mem.Allocator, dq: DisplayQuantity, factor: f
         .mode = dq.mode,
         .is_delta = dq.is_delta,
         .value_space = dq.value_space,
+        .display_factor = dq.display_factor,
     };
 }
 
 pub fn addDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
-    const canonical_value = a.canonicalValue() + b.canonicalValue();
+    // "20 °C + 10 °C" is a temperature plus a change, so a point on an offset
+    // scale added to an absolute value contributes its step, not its offset.
+    const addend = if (!a.is_delta and isOffsetPoint(b)) offsetStep(b) else b.canonicalValue();
+    const canonical_value = a.canonicalValue() + addend;
     const result_is_delta = inferAddDeltaState(a.dim, a.is_delta, b.is_delta);
     return displayResultFromCanonical(allocator, canonical_value, a.dim, a.unit, a.mode, result_is_delta);
 }
@@ -138,9 +146,7 @@ pub fn subDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    if ((isTemperatureDim(a.dim) and a.is_delta) or
-        (isTemperatureDim(b.dim) and b.is_delta))
-        return error.MulDivTemperatureDelta;
+    if (isOffsetPoint(a) or isOffsetPoint(b)) return error.OffsetUnitArithmetic;
 
     const new_dim = Dimension.checkedAdd(a.dim, b.dim) orelse return error.DimensionOverflow;
 
@@ -165,9 +171,7 @@ pub fn mulDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
-    if ((isTemperatureDim(a.dim) and a.is_delta) or
-        (isTemperatureDim(b.dim) and b.is_delta))
-        return error.MulDivTemperatureDelta;
+    if (isOffsetPoint(a) or isOffsetPoint(b)) return error.OffsetUnitArithmetic;
 
     const new_dim = Dimension.checkedSub(a.dim, b.dim) orelse return error.DimensionOverflow;
 
@@ -192,6 +196,7 @@ pub fn divDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQu
 }
 
 pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: i32) !DisplayQuantity {
+    if (isOffsetPoint(a)) return error.OffsetUnitArithmetic;
     const new_dim = Dimension.checkedMulByRational(a.dim, Rational.fromInt(exp_int)) orelse return error.DimensionOverflow;
 
     const fallback = try std.fmt.allocPrint(allocator, "{s}^{d}", .{ a.unit, exp_int });
@@ -216,6 +221,7 @@ pub fn powDisplayInt(allocator: std.mem.Allocator, a: DisplayQuantity, exp_int: 
 }
 
 pub fn powDisplayRational(allocator: std.mem.Allocator, a: DisplayQuantity, exp: Rational) !DisplayQuantity {
+    if (isOffsetPoint(a)) return error.OffsetUnitArithmetic;
     const new_dim = Dimension.checkedMulByRational(a.dim, exp) orelse return error.DimensionOverflow;
 
     const fallback = if (exp.isInteger())
@@ -257,6 +263,22 @@ fn findBuiltinUnit(symbol: []const u8) ?Unit {
     if (IndustrialRegistry.find(symbol)) |u| return u;
 
     return null;
+}
+
+/// An absolute value in a unit with an offset (°C, °F, barg) is a point on a
+/// scale. Multiplying, dividing or scaling it has two readings, on the scale
+/// or from absolute zero, so those operations refuse it. Convert it first
+/// ("25 °C as K") or use a difference ("30 °C - 20 °C").
+fn isOffsetPoint(dq: DisplayQuantity) bool {
+    if (dq.is_delta) return false;
+    const unit = findBuiltinUnit(dq.unit) orelse return false;
+    return unit.isAffine();
+}
+
+/// The size of an offset point read as a difference, in canonical units.
+fn offsetStep(dq: DisplayQuantity) f64 {
+    const unit = findBuiltinUnit(dq.unit) orelse return dq.canonicalValue();
+    return unit.toCanonicalValue(dq.valueForCurrentUnit(), true);
 }
 
 fn isTemperatureDim(dim: Dimension) bool {

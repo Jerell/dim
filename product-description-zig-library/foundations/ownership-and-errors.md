@@ -26,7 +26,7 @@ The consumer chooses an allocator for returned values and, for isolated runtime 
 
 ### Compile or return immediately
 
-Compile-time mismatches are rejected before allocation or execution. Runtime constructors and operations return explicit errors such as `DimensionMismatch`, `MulDivTemperatureDelta`, and `AffineUnitCombination`. `evaluate` returns `EvaluationError!LiteralValue`, preserving parse, runtime, and allocation failures.
+Compile-time mismatches are rejected before allocation or execution. Runtime constructors and operations return explicit errors such as `DimensionMismatch`, `OffsetUnitArithmetic`, and `AffineUnitCombination`. `evaluate` returns `EvaluationError!LiteralValue`, preserving parse, runtime, and allocation failures.
 
 ### Begin execution
 
@@ -45,7 +45,7 @@ The caller owns the allocator-backed result it requested and must call the match
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Typed construction has no result allocator; dynamic/evaluation paths may allocate. | Ownership does not change during a call. |
-| Checked or unchecked operation | Quantity unchecked variants assume their preconditions; Unit composition always returns `UnitCompositionError`. | Cannot change method behavior mid-call. |
+| Checked or unchecked operation | Quantity arithmetic is infallible; Unit composition always returns `UnitCompositionError`. | Cannot change method behavior mid-call. |
 | Dimension and quantity type | Typed values are allocation-free; display/runtime values may own strings. | No effect on existing ownership. |
 | Registry and format mode | Formatting can allocate normalized text and choose registry output. | A later format call may allocate separately. |
 | Affine or delta state | May determine whether an error is returned. | Current result retains its delta state. |
@@ -58,7 +58,7 @@ The caller owns the allocator-backed result it requested and must call the match
 | Compile-time rejection | No allocations or cleanup are needed. | No type operation can be cancelled. |
 | Caller doing another operation | Caller can reuse an allocator/context according to its ownership rules. | Scratch work is not a second result; later calls may reset it. |
 | Operation completes before extension | Plain typed values return without cleanup. | No partial owned result is promised. |
-| Runtime error or panic | Caller receives a typed error where the API provides it. | Unchecked Quantity variants can still assume their preconditions. |
+| Runtime error or panic | Caller receives a typed error where the API provides it. | Quantity arithmetic has no error path. |
 | Allocator failure or resource teardown | Allocation can return an error/null before a result is delivered. | Caller must not deinit an uninitialized result; context teardown ends its storage. |
 | Input value/type/unit changing | New calls use new inputs. | Existing returned strings and values do not change. |
 | Second context or thread using same state | Explicit contexts isolate ownership and constants. | A shared context requires external coordination. |
@@ -71,7 +71,7 @@ The caller owns the allocator-backed result it requested and must call the match
 
 **Units and registries.** Dynamic lookup and formatting can allocate copied symbols.
 
-**Affine and delta semantics.** Checked runtime state can produce errors that must be handled.
+**Affine and delta semantics.** The display helpers return `OffsetUnitArithmetic` for arithmetic on an absolute value in an offset unit, which must be handled.
 
 **Formatting.** Display wrappers may own normalized unit strings.
 

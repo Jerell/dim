@@ -128,6 +128,24 @@ pub fn scaleDisplay(allocator: std.mem.Allocator, dq: DisplayQuantity, factor: f
     };
 }
 
+/// Read a quantity as a difference: "Δ20 °C" is twenty degrees, not the
+/// temperature 20 °C.
+pub fn deltaDisplay(allocator: std.mem.Allocator, dq: DisplayQuantity) !DisplayQuantity {
+    if (isOffsetPoint(dq)) {
+        return displayResultFromCanonical(allocator, offsetStep(dq), dq.dim, dq.unit, dq.mode, true);
+    }
+    return DisplayQuantity{
+        .value = dq.value,
+        .dim = dq.dim,
+        .unit = try allocator.dupe(u8, dq.unit),
+        .owns_unit = true,
+        .mode = dq.mode,
+        .is_delta = true,
+        .value_space = dq.value_space,
+        .display_factor = dq.display_factor,
+    };
+}
+
 pub fn addDisplay(allocator: std.mem.Allocator, a: DisplayQuantity, b: DisplayQuantity) !DisplayQuantity {
     if (!Dimension.eql(a.dim, b.dim)) return error.InvalidOperands;
     // "20 °C + 10 °C" is a temperature plus a change, so a point on an offset
@@ -269,7 +287,7 @@ fn findBuiltinUnit(symbol: []const u8) ?Unit {
 /// scale. Multiplying, dividing or scaling it has two readings, on the scale
 /// or from absolute zero, so those operations refuse it. Convert it first
 /// ("25 °C as K") or use a difference ("30 °C - 20 °C").
-fn isOffsetPoint(dq: DisplayQuantity) bool {
+pub fn isOffsetPoint(dq: DisplayQuantity) bool {
     if (dq.is_delta) return false;
     const unit = findBuiltinUnit(dq.unit) orelse return false;
     return unit.isAffine();

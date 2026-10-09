@@ -2,7 +2,7 @@
 
 ## Summary
 
-Expressions let the user calculate numbers and quantities with `+`, `-`, `*`, `/`, powers, comparisons, grouping, and unit literals. They are entered as a direct argument, REPL line, stdin line, or file line. A successful expression prints one result; incompatible operands or invalid operations print a runtime error.
+Expressions let the user calculate numbers and quantities with `+`, `-`, `*`, `/`, powers, comparisons, grouping, unit literals, and delta literals (`Δ20 °C`, `delta 20 °C`). They are entered as a direct argument, REPL line, stdin line, or file line. A successful expression prints one result; incompatible operands or invalid operations print a runtime error.
 
 ## The simple case
 
@@ -93,6 +93,8 @@ The result is formatted and printed with a newline. No expression result is pers
 
 - Adding quantities with different dimensions fails rather than silently converting.
 - Multiplying, dividing, scaling or raising an absolute value in an offset unit (`°C`, `°F`, `barg`) fails with `OffsetUnitArithmetic`; convert it first (`(25 °C as K) * 2`) or use a difference. Adding two such values reads the right side as a change, and a difference multiplies like any amount.
+- `Δ` or `delta` before a quantity marks it as a difference: `30 °C - Δ20 °C` prints `10 °C`, `Δ20 °C as K` prints `Δ20 K`, and `Δ2 barg` prints `Δ2 bar`. Before a bare number it fails with `InvalidOperand`.
+- Negating a grouped absolute value in an offset unit, as in `-(10 °C)`, fails with `OffsetUnitArithmetic`; `-10 °C` is the literal minus ten degrees.
 - Dimensionless quotients print without a pseudo-unit.
 - Fractional powers can produce rational dimensions and normalized unit text.
 - A trailing token after a non-assignment expression produces an unexpected-token parse diagnostic.

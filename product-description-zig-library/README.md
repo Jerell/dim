@@ -31,7 +31,7 @@ Each document uses the same skeleton for one public capability. The unit of inte
 1. **Summary.** What the API capability lets a consumer do and which public type or function exposes it.
 2. **The simple case.** The smallest compiling and running example.
 3. **The interaction, event by event.** The five library-operation phases: declare, compile or return immediately, begin execution, while executing, and return.
-4. **Modifiers.** The fixed API variant axis: compile-time or runtime unit, fallible or unchecked Quantity operation, dimension/quantity type, registry and format mode, affine/delta state, and allocator/context.
+4. **Modifiers.** The fixed API variant axis: compile-time or runtime unit, fallible or infallible operation, dimension/quantity type, registry and format mode, affine/delta state, and allocator/context.
 5. **Cancel and interrupt.** The fixed rows are: compile-time rejection; the caller doing another operation; an operation that completes before extension; runtime error or panic; allocator failure or resource teardown; input value/type/unit changing; and a second context or thread using the same state.
 6. **Interactions with other systems.** Compile-time safety; dimensions and rational exponents; units and registries; affine/delta semantics; formatting; allocators and ownership; contexts and constants; concurrency; and release/build configuration.
 7. **Edge cases.** Dimension mismatch, affine units, rational powers, empty or missing units, context isolation, and ownership boundaries.

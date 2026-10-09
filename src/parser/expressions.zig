@@ -118,10 +118,16 @@ pub const Unary = struct {
                 if (rv == .number) return .{ .number = -rv.number };
                 if (rv == .display_quantity) {
                     var dq = rv.display_quantity;
+                    if (rt.isOffsetPoint(dq)) return RuntimeError.OffsetUnitArithmetic;
                     dq.value = -dq.value;
                     return .{ .display_quantity = dq };
                 }
                 return RuntimeError.InvalidOperand;
+            },
+            .Delta => {
+                if (rv != .display_quantity) return RuntimeError.InvalidOperand;
+                const dq = try rt.deltaDisplay(allocator, rv.display_quantity);
+                return .{ .display_quantity = dq };
             },
             .Bang => {
                 const truthy = switch (rv) {

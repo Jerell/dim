@@ -245,7 +245,7 @@ pub const Parser = struct {
     }
 
     fn unary(self: *Parser) ParseError!*ast_expr.Expr {
-        if (self.match(&.{ TokenType.Minus, TokenType.Bang })) {
+        if (self.match(&.{ TokenType.Minus, TokenType.Bang, TokenType.Delta })) {
             const op = self.previous();
             // Special-case: "-<number> <unit_expr>" should bind the minus to the number
             // before unit application, so parse it as Unit(value = -number, unit_expr).

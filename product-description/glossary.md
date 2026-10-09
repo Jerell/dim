@@ -30,9 +30,9 @@ The vocabulary used across these documents. When a document uses one of these wo
 
 **Affine unit.** A unit with an offset as well as a scale, such as Celsius or Fahrenheit. Addition and subtraction treat absolute values and deltas differently; affine units cannot be raised to a non-integer exponent.
 
-**Delta.** A quantity representing a difference between two absolute quantities. For example, subtracting two temperatures produces a temperature delta rather than an absolute temperature.
+**Delta.** A quantity representing a difference between two absolute quantities. For example, subtracting two temperatures produces a temperature delta rather than an absolute temperature. A delta is written directly with `Δ` or `delta` before a quantity: `Δ20 °C` is twenty degrees, not the temperature 20 °C. Results print a delta with the same `Δ` prefix.
 
-**Constant.** A named runtime quantity defined with `name = (expression)`. A constant remains available in later REPL lines and has precedence over unit registries.
+**Constant.** A named runtime quantity defined with `name = (expression)`. A constant remains available in later REPL lines and has precedence over unit registries. `delta` is a keyword and cannot be a constant name.
 
 ## Invocation state
 

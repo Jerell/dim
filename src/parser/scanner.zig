@@ -74,6 +74,12 @@ pub const Scanner = struct {
             try self.identifier();
             return;
         }
+        // U+0394 GREEK CAPITAL LETTER DELTA marks a difference: "Δ20 °C".
+        if (c == 0xCE and self.peek() == 0x94) {
+            _ = self.advance();
+            try self.addToken(TokenType.Delta, null);
+            return;
+        }
         // U+2103 DEGREE CELSIUS and U+2109 DEGREE FAHRENHEIT are whole unit identifiers.
         if (c == 0xE2 and self.peek() == 0x84 and (self.peekNext() == 0x83 or self.peekNext() == 0x89)) {
             self.current += 2;
@@ -346,6 +352,7 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "and", TokenType.And },
     .{ "or", TokenType.Or },
     .{ "as", TokenType.As },
+    .{ "delta", TokenType.Delta },
     .{ "list", TokenType.List },
     .{ "show", TokenType.Show },
     .{ "clear", TokenType.Clear },

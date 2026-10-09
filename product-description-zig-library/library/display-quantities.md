@@ -25,7 +25,7 @@ The consumer chooses an allocator and supplies display quantities with dimension
 
 ### Compile or return immediately
 
-Display helpers return error unions for invalid operands, unsafe temperature-delta multiplication/division, and allocation failure. Dimension compatibility is checked at runtime rather than through a generic result type.
+Display helpers return error unions for invalid operands, arithmetic on an absolute value in an offset unit (`OffsetUnitArithmetic`), and allocation failure. Dimension compatibility is checked at runtime rather than through a generic result type.
 
 ### Begin execution
 
@@ -33,7 +33,7 @@ The operation combines canonical/display values according to the helper. Additio
 
 ### While executing
 
-Each result is recomputed from input values and gets an owned unit string. Temperature delta restrictions can reject multiplication or division. The input display quantities are not mutated.
+Each result is recomputed from input values and gets an owned unit string. Multiplying, dividing, scaling or raising an absolute value in an offset unit is rejected. Adding one to an absolute value reads it as a change. The input display quantities are not mutated.
 
 ### Return
 
@@ -44,7 +44,7 @@ The caller receives a new `DisplayQuantity` and must deinit it. The original inp
 | Variant | Set at the start | Changed while extended |
 | --- | --- | --- |
 | Compile-time or runtime unit | Display operations resolve dimensions at runtime. | Unit strings remain attached to current values. |
-| Checked or unchecked operation | Runtime helpers enforce unsafe delta rules. | No method switch mid-call. |
+| Checked or unchecked operation | Runtime helpers enforce the offset-unit rules. | No method switch mid-call. |
 | Dimension and quantity type | Runtime dimensions determine compatibility/result. | Current result type does not change. |
 | Registry and format mode | Unit/format metadata travels with the display value. | Later formatting can choose another wrapper. |
 | Affine or delta state | Delta marker affects arithmetic safety and output. | Current operation uses captured markers. |
@@ -85,7 +85,7 @@ The caller receives a new `DisplayQuantity` and must deinit it. The original inp
 ## Edge cases
 
 - A dimensionless result can have no displayed pseudo-unit.
-- Multiplying, dividing, scaling or raising an absolute value whose unit has an offset (`°C`, `°F`, `barg`) returns `OffsetUnitArithmetic`. A temperature delta multiplies like any amount.
+- Multiplying, dividing, scaling or raising an absolute value whose unit has an offset (`°C`, `°F`, `barg`) returns `OffsetUnitArithmetic`. A temperature delta multiplies like any amount. `deltaDisplay` reads a quantity as a difference, taking the step and not the offset of an absolute value in an offset unit.
 - A result's unit string may be normalized rather than preserving the input spelling.
 
 ## Open questions and verification

@@ -554,6 +554,34 @@ test "micro identifiers reject incomplete UTF-8 sequences" {
     }
 }
 
+test "degree-sign temperature spellings are absolute Celsius and Fahrenheit" {
+    for ([_]struct { expression: []const u8, kelvin: f64 }{
+        .{ .expression = "50 °C as K", .kelvin = 323.15 },
+        .{ .expression = "50°C as K", .kelvin = 323.15 },
+        .{ .expression = "50 degC as K", .kelvin = 323.15 },
+        .{ .expression = "50 C as K", .kelvin = 323.15 },
+        .{ .expression = "122 °F as K", .kelvin = 323.15 },
+    }) |case| {
+        var result = try evaluate(std.testing.allocator, case.expression, null);
+        defer deinitLiteralValue(std.testing.allocator, &result);
+        switch (result) {
+            .display_quantity => |dq| try std.testing.expectApproxEqAbs(case.kelvin, dq.value, 1e-9),
+            else => return error.TestUnexpectedResult,
+        }
+    }
+    var celsius = try evaluate(std.testing.allocator, "323.15 K as °C", null);
+    defer deinitLiteralValue(std.testing.allocator, &celsius);
+    switch (celsius) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(50.0, dq.value, 1e-9);
+            try std.testing.expectEqualStrings("°C", dq.unit);
+        },
+        else => return error.TestUnexpectedResult,
+    }
+    try std.testing.expect(findUnitAll("m°C") == null);
+    try std.testing.expectError(error.InvalidToken, evaluate(std.testing.allocator, "50 \xc2", null));
+}
+
 test "volume units cover litres and both gallons" {
     const litre = findUnitAll("L") orelse return error.TestUnexpectedResult;
     try std.testing.expect(Dimension.eql(litre.dim, Dimensions.Volume));

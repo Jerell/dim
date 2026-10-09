@@ -25,6 +25,10 @@ Micrometre inputs accept `um`, `µm` (micro sign), `μm` (Greek mu),
 `micrometer`, and `micrometre`. These are the same length unit; for example,
 `45 µm as m` evaluates to `0.000045 m`.
 
+Celsius accepts `°C`, `degC`, `C`, and `celsius`; Fahrenheit accepts `°F`,
+`degF`, `F`, and `fahrenheit`. For example, `50 °C as K` evaluates to
+`323.15 K`.
+
 ## ✨ Features
 
 - **Library (`dim`)**

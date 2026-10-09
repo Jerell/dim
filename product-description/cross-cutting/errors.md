@@ -32,7 +32,7 @@ Invalid argument forms can terminate the process with status 64. A scanner or pa
 
 ### Begin running
 
-A parsed expression is evaluated. Runtime failures include invalid operands, division by zero, undefined variables, dimension overflow, affine exponentiation, and invalid temperature delta multiplication or division.
+A parsed expression is evaluated. Runtime failures include invalid operands, division by zero, undefined variables, dimension overflow, affine exponentiation, and multiplication, division, scaling or exponentiation of an absolute value in an offset unit.
 
 ### While running
 

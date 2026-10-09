@@ -438,6 +438,17 @@ fn runPrompt(allocator: std.mem.Allocator, in: *std.Io.Reader, out: *std.Io.Writ
     }
 }
 
+fn reportRuntimeError(err: *std.Io.Writer, eval_err: dim.RuntimeError) !void {
+    try err.print("Runtime error: {any}\n", .{eval_err});
+    if (eval_err == error.OffsetUnitArithmetic) {
+        try err.print(
+            "A value in °C, °F or barg is a point on a scale, so it cannot be multiplied, divided or scaled. " ++
+                "Convert it first, as in \"(25 °C as K) * 2\", or use a difference, as in \"(30 °C - 20 °C) * 2\".\n",
+            .{},
+        );
+    }
+}
+
 fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, source: []const u8) !bool {
     const trimmed = std.mem.trim(u8, source, " \t\r\n");
     if (trimmed.len == 0) return true;
@@ -512,7 +523,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
 
     // 3. Evaluate
     const result = expr.evaluate(allocator) catch |eval_err| {
-        try err_writer.?.print("Runtime error: {any}\n", .{eval_err});
+        try reportRuntimeError(err_writer.?, eval_err);
         return false;
     };
 
@@ -531,7 +542,7 @@ fn run(allocator: std.mem.Allocator, out: *std.Io.Writer, err: *std.Io.Writer, s
             const maybe_expr2 = trail_parser.parse();
             if (maybe_expr2) |expr2| {
                 const res2 = expr2.evaluate(allocator) catch |eval_err| {
-                    try err_writer.?.print("Runtime error: {any}\n", .{eval_err});
+                    try reportRuntimeError(err_writer.?, eval_err);
                     return false;
                 };
                 switch (res2) {

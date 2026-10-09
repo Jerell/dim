@@ -140,7 +140,7 @@ export const DIM_STATUS = {
   nonRationalDimensionalExponent: 11,
   affineUnitExponentiation: 12,
   dimensionOverflow: 13,
-  mulDivTemperatureDelta: 14,
+  offsetUnitArithmetic: 14,
 } as const;
 
 export type DimStatusCode = (typeof DIM_STATUS)[keyof typeof DIM_STATUS];

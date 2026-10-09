@@ -92,7 +92,7 @@ The result is formatted and printed with a newline. No expression result is pers
 ## Edge cases
 
 - Adding quantities with different dimensions fails rather than silently converting.
-- Multiplication and division with affine temperature deltas can fail even when the displayed units look compatible.
+- Multiplying, dividing, scaling or raising an absolute value in an offset unit (`°C`, `°F`, `barg`) fails with `OffsetUnitArithmetic`; convert it first (`(25 °C as K) * 2`) or use a difference. Adding two such values reads the right side as a change, and a difference multiplies like any amount.
 - Dimensionless quotients print without a pseudo-unit.
 - Fractional powers can produce rational dimensions and normalized unit text.
 - A trailing token after a non-assignment expression produces an unexpected-token parse diagnostic.

@@ -85,7 +85,7 @@ The caller receives a new `DisplayQuantity` and must deinit it. The original inp
 ## Edge cases
 
 - A dimensionless result can have no displayed pseudo-unit.
-- Multiplying a temperature delta is rejected even when dimensions could otherwise be combined.
+- Multiplying, dividing, scaling or raising an absolute value whose unit has an offset (`°C`, `°F`, `barg`) returns `OffsetUnitArithmetic`. A temperature delta multiplies like any amount.
 - A result's unit string may be normalized rather than preserving the input spelling.
 
 ## Open questions and verification

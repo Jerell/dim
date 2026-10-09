@@ -38,7 +38,7 @@ pub const DimStatus = enum(i32) {
     non_rational_dimensional_exponent = 11,
     affine_unit_exponentiation = 12,
     dimension_overflow = 13,
-    mul_div_temperature_delta = 14,
+    offset_unit_arithmetic = 14,
 };
 
 pub const DimValueKind = enum(u32) {
@@ -143,7 +143,7 @@ fn evaluationStatus(err: dim.EvaluationError) DimStatus {
         error.NonRationalDimensionalExponent => .non_rational_dimensional_exponent,
         error.AffineUnitExponentiation => .affine_unit_exponentiation,
         error.DimensionOverflow => .dimension_overflow,
-        error.MulDivTemperatureDelta => .mul_div_temperature_delta,
+        error.OffsetUnitArithmetic => .offset_unit_arithmetic,
     };
 }
 

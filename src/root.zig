@@ -3,7 +3,6 @@ const std = @import("std");
 pub const Dimension = @import("dimension.zig").Dimension;
 pub const Rational = @import("rational.zig").Rational;
 pub const Quantity = @import("quantity.zig").Quantity;
-pub const QuantityError = @import("quantity.zig").QuantityError;
 pub const Dimensions = @import("dimension.zig").Dimensions;
 pub const Unit = @import("unit.zig").Unit;
 pub const UnitCompositionError = @import("unit.zig").UnitCompositionError;
@@ -296,7 +295,7 @@ test "basic dimensional arithmetic" {
 
     const d = LengthQ.init(100.0); // 100 m
     const t = TimeQ.init(10.0); // 10 s
-    const v = try d.div(t);
+    const v = d.div(t);
 
     try std.testing.expectApproxEqAbs(10.0, v.value, 1e-9);
     comptime {
@@ -313,7 +312,9 @@ test "public quantity scalar operations preserve delta state" {
     const TempQ = Quantity(Dimensions.Temperature);
     const delta = (TempQ{ .value = 10.0, .is_delta = true }).scale(2.0);
     try std.testing.expect(delta.is_delta);
-    try std.testing.expectError(error.MulDivTemperatureDelta, delta.mulChecked(LengthQ.init(1.0)));
+    const product = delta.mul(LengthQ.init(1.0));
+    try std.testing.expectApproxEqAbs(20.0, product.value, 1e-9);
+    try std.testing.expect(!product.is_delta);
 }
 
 test "force = mass * acceleration" {
@@ -323,7 +324,7 @@ test "force = mass * acceleration" {
 
     const m = MassQ.init(2.0); // 2 kg
     const a = AccelQ.init(9.81); // 9.81 m/s^2
-    const f = try m.mul(a);
+    const f = m.mul(a);
 
     comptime {
         const ResultQ = @TypeOf(f);
@@ -605,6 +606,65 @@ test "an affine unit inside a compound unit is a step, not an absolute temperatu
         .display_quantity => |dq| try std.testing.expect(std.mem.indexOf(u8, dq.unit, "°C") == null),
         else => return error.TestUnexpectedResult,
     }
+}
+
+fn expectQuantity(expression: []const u8, value: f64, unit: []const u8, is_delta: bool) !void {
+    var result = try evaluate(std.testing.allocator, expression, null);
+    defer deinitLiteralValue(std.testing.allocator, &result);
+    switch (result) {
+        .display_quantity => |dq| {
+            try std.testing.expectApproxEqAbs(value, dq.valueForCurrentUnit(), 1e-9);
+            try std.testing.expectEqualStrings(unit, dq.unit);
+            try std.testing.expectEqual(is_delta, dq.is_delta);
+        },
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+test "a point on an offset scale is not multiplied, divided, scaled or raised" {
+    for ([_][]const u8{
+        "2 * 10 °C",
+        "10 °C * 2",
+        "10 °C / 2",
+        "4180 J/(kg*°C) * 10 °C",
+        "1 °C * 1 m",
+        "10 °F / 2 s",
+        "(10 °C)^2",
+        "(10 °C + 10 °C) / 2",
+        "10 barg * 2",
+        "10 barg * 2 m^2",
+    }) |expression| {
+        try std.testing.expectError(error.OffsetUnitArithmetic, evaluate(std.testing.allocator, expression, null));
+    }
+}
+
+test "kelvin, an explicit conversion and absolute pressure multiply as amounts" {
+    try expectQuantity("2 * 10 K", 20.0, "K", false);
+    try expectQuantity("(25 °C as K) * 2", 596.3, "K", false);
+    try expectQuantity("(25 °C as K) * 8.314 J/(mol*K) as J/mol", 2478.8191, "J/mol", false);
+    try expectQuantity("10 bara * 2", 20.0, "bara", false);
+    try expectQuantity("(1 m/s as km/h) * 1 h as km", 3.6, "km", false);
+}
+
+test "adding to a temperature reads the right side as a change" {
+    try expectQuantity("10 °C + 10 °C", 20.0, "°C", false);
+    try expectQuantity("20 °C + 10 °C as K", 303.15, "K", false);
+    try expectQuantity("300 K + 10 °C", 310.0, "K", false);
+    try expectQuantity("10 °C + 5 K", 15.0, "°C", false);
+    try expectQuantity("50 °F + 18 °F", 68.0, "°F", false);
+    try expectQuantity("10 °C + 18 °F", 20.0, "°C", false);
+    try expectQuantity("10 barg + 2 barg", 12.0, "barg", false);
+    try expectQuantity("(30 °C - 20 °C) + 5 °C", 15.0, "°C", false);
+}
+
+test "subtracting temperatures gives a difference that multiplies" {
+    try expectQuantity("30 °C - 20 °C", 10.0, "°C", true);
+    try expectQuantity("(30 °C - 20 °C) as K", 10.0, "K", true);
+    try expectQuantity("(30 °C - 20 °C) as °F", 18.0, "°F", true);
+    try expectQuantity("(30 °C - 20 °C) * 2", 20.0, "°C", true);
+    try expectQuantity("4180 J/(kg*°C) * (30 °C - 20 °C) as J/kg", 41800.0, "J/kg", false);
+    try expectQuantity("(30 °C - 20 °C) * 4180 J/(kg*K) as J/kg", 41800.0, "J/kg", false);
+    try expectQuantity("100 W / (30 °C - 20 °C) as W/K", 10.0, "W/K", false);
 }
 
 test "volume units cover litres and both gallons" {

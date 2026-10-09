@@ -335,7 +335,8 @@ pub const Parser = struct {
         }
 
         if (self.match(&.{TokenType.LParen})) {
-            const inner = try self.expression();
+            // A group may convert, so "(25 °C as K) * 2" states its unit.
+            const inner = try self.conversion();
             _ = try self.consume(TokenType.RParen, "Expect ')' after expression.");
             const node_ptr = try self.allocator.create(ast_expr.Expr);
             node_ptr.* = ast_expr.Expr{
@@ -363,6 +364,14 @@ pub const Parser = struct {
             if (after_op_index >= self.tokens.len) break;
             const next_t = self.tokens[after_op_index].type;
             if (!(next_t == TokenType.Identifier or next_t == TokenType.LParen)) break;
+            // "(" continues the unit only when it opens a unit group, so
+            // "4180 J/(kg*K) * (30 °C - 20 °C)" multiplies by the difference.
+            if (next_t == TokenType.LParen) {
+                const inside_index = after_op_index + 1;
+                if (inside_index >= self.tokens.len) break;
+                const inside_t = self.tokens[inside_index].type;
+                if (!(inside_t == TokenType.Identifier or inside_t == TokenType.LParen)) break;
+            }
 
             // Consume operator and parse the next unit factor
             _ = self.advance();

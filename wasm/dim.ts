@@ -20,6 +20,12 @@ type DimExports = {
     inLen: number,
     outResultPtr: number,
   ) => number;
+  dim_ctx_eval_quantity: (
+    ctx: number,
+    inPtr: number,
+    inLen: number,
+    outResultPtr: number,
+  ) => number;
   dim_ctx_convert_expr: (
     ctx: number,
     exprPtr: number,
@@ -754,6 +760,19 @@ export function evalStructured(expr: string): DimEvalResult {
   }
 }
 
+export function evalQuantity(expr: string): DimQuantityResult {
+  const rt = requireRuntime();
+  try {
+    const input = writeUtf8(rt, expr);
+    const outPtr = alloc(rt, QUANTITY_RESULT_SIZE);
+    const rc = rt.dim_ctx_eval_quantity(rt.ctx, input.ptr, input.len, outPtr);
+    expectStatus(rc, "dim_ctx_eval_quantity");
+    return readQuantityResult(rt, outPtr);
+  } finally {
+    rt.dim_ffi_reset();
+  }
+}
+
 export function convertExpr(expr: string, unit: string): DimQuantityResult {
   const rt = requireRuntime();
   try {
@@ -1118,6 +1137,7 @@ const dim = {
   recover: recoverDim,
   eval: evalDim,
   evalStructured,
+  evalQuantity,
   formatEvalResult,
   formatQuantity,
   defineConst,

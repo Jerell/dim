@@ -7,6 +7,7 @@ import {
   DIM_STATUS,
   DimWasmError,
   evalStructured,
+  evalQuantity,
   formatEvalResult,
   initDim,
   isCompatible,
@@ -15,6 +16,42 @@ import {
 
 const wasmBytes = await readFile("zig-out/bin/dim_wasm.wasm");
 await initDim({ wasmBytes });
+
+for (const [expression, expected] of [["2", 2], ["-7.5", -7.5], ["0", 0], ["2 + 3 * 4", 14], ["6 m / 2 m", 3]]) {
+  const result = evalQuantity(expression);
+  if (result.value !== expected || result.unit !== "1" || result.isDelta ||
+      Object.values(result.dim).some(({ num, den }) => num !== 0 || den !== 1)) {
+    throw new Error(`${expression}: invalid dimensionless quantity ${JSON.stringify(result)}`);
+  }
+}
+for (const [expression, expected] of [["5 bar", 5], ["45 degC", 45], ["30 degC - 20 degC", 10]]) {
+  const result = evalQuantity(expression);
+  const structured = evalStructured(expression);
+  if (result.value !== expected || JSON.stringify(result) !== JSON.stringify(structured)) {
+    throw new Error(`${expression}: quantity evaluation changed ${JSON.stringify(result)}`);
+  }
+}
+for (const expression of ['1 < 2', '2 == 3']) {
+  try {
+    evalQuantity(expression);
+    throw new Error(`${expression}: accepted a non-quantity`);
+  } catch (error) {
+    if (!(error instanceof DimWasmError) || error.status !== DIM_STATUS.wrongKind) throw error;
+  }
+}
+try {
+  evalQuantity("2 +");
+  throw new Error("accepted invalid syntax");
+} catch (error) {
+  if (!(error instanceof DimWasmError) || error.status !== DIM_STATUS.parseError) throw error;
+}
+if (evalQuantity("9").value !== 9) throw new Error("evaluation did not recover after rejection");
+if (convertValue(2, "1", "1") !== 2 || convertValue(2, "1", "ppm") !== 2e6 ||
+    convertValue(2e6, "ppm", "1") !== 2) {
+  throw new Error("dimensionless numeric conversions lost their value");
+}
+const scalar = evalStructured("2");
+if (scalar.kind !== "number" || scalar.value !== 2) throw new Error("structured scalar changed");
 
 const quantity = evalStructured("100 km/h as m/s");
 if (quantity.kind !== "quantity" || Math.abs(quantity.value - 27.7777777778) > 1e-9) {

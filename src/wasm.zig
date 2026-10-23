@@ -232,6 +232,8 @@ fn buildConvertValueExpression(
     from_unit: []const u8,
     to_unit: []const u8,
 ) ![]u8 {
+    if (std.mem.eql(u8, std.mem.trim(u8, from_unit, " "), "1"))
+        return std.fmt.allocPrint(allocator, "{d} as {s}", .{ value, to_unit });
     return std.fmt.allocPrint(allocator, "{d} {s} as {s}", .{ value, from_unit, to_unit });
 }
 
@@ -323,6 +325,30 @@ pub export fn dim_ctx_eval(
         return statusCode(evaluationStatus(err));
     };
     fillEvalResult(out_result, value);
+    return statusCode(.ok);
+}
+
+pub export fn dim_ctx_eval_quantity(
+    ctx: ?*dim.DimContext,
+    input_ptr: [*]const u8,
+    input_len: usize,
+    out_result: *DimQuantityResult,
+) i32 {
+    out_result.* = std.mem.zeroes(DimQuantityResult);
+    const actual = ensureContext(ctx) orelse return statusCode(.invalid_argument);
+    const value = evaluateOwned(actual, input_ptr[0..input_len]) catch |err| {
+        return statusCode(evaluationStatus(err));
+    };
+    switch (value) {
+        .number => |number| {
+            out_result.value = number;
+            fillDimensionsQuantity(dim.Dimensions.Dimensionless, out_result);
+            out_result.unit_ptr = @intFromPtr("1".ptr);
+            out_result.unit_len = 1;
+        },
+        .display_quantity => |quantity| fillQuantityResult(out_result, quantity),
+        else => return statusCode(.wrong_kind),
+    }
     return statusCode(.ok);
 }
 

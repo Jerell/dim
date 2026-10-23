@@ -203,7 +203,7 @@ The current ABI is context-based and returns structured values:
 - `dim_alloc`, `dim_ffi_reset`, and `dim_free`
 
 The shipped [`wasm/dim.ts`](wasm/dim.ts) wrapper exposes these as
-`evalStructured`, `convertExpr`, `convertValue`, `isCompatible`,
+`evalStructured`, `evalQuantity`, `convertExpr`, `convertValue`, `isCompatible`,
 `sameDimension`, batch conversion helpers, and context constant helpers.
 Dimension components are exact `{ num, den }` rational pairs.
 
@@ -367,3 +367,8 @@ MIT — see [LICENSE](./LICENSE) for details.
 ## Notes
 
 - Parentheses are required in constant declarations to clearly delimit the value expression: `name = (Expr)`.
+
+`evalQuantity(expression)` and C ABI `dim_ctx_eval_quantity` return a quantity for
+scalar or unit-bearing expressions. Scalars use unit `1` with zero rational
+dimensions (denominator 1). Boolean, string and nil results return `wrong_kind`;
+`evalStructured` continues to preserve each result kind.

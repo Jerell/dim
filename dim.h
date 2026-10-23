@@ -113,6 +113,12 @@ extern "C"
       size_t input_len,
       DimEvalResult *out_result);
 
+  int32_t dim_ctx_eval_quantity(
+      DimContext *ctx,
+      const uint8_t *input_ptr,
+      size_t input_len,
+      DimQuantityResult *out_result);
+
   int32_t dim_ctx_convert_expr(
       DimContext *ctx,
       const uint8_t *expr_ptr,

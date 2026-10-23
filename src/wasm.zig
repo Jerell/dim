@@ -232,6 +232,8 @@ fn buildConvertValueExpression(
     from_unit: []const u8,
     to_unit: []const u8,
 ) ![]u8 {
+    if (std.mem.eql(u8, std.mem.trim(u8, from_unit, " "), "1"))
+        return std.fmt.allocPrint(allocator, "{d} as {s}", .{ value, to_unit });
     return std.fmt.allocPrint(allocator, "{d} {s} as {s}", .{ value, from_unit, to_unit });
 }
 

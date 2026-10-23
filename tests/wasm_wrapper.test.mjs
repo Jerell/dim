@@ -46,6 +46,10 @@ try {
   if (!(error instanceof DimWasmError) || error.status !== DIM_STATUS.parseError) throw error;
 }
 if (evalQuantity("9").value !== 9) throw new Error("evaluation did not recover after rejection");
+if (convertValue(2, "1", "1") !== 2 || convertValue(2, "1", "ppm") !== 2e6 ||
+    convertValue(2e6, "ppm", "1") !== 2) {
+  throw new Error("dimensionless numeric conversions lost their value");
+}
 const scalar = evalStructured("2");
 if (scalar.kind !== "number" || scalar.value !== 2) throw new Error("structured scalar changed");
 
